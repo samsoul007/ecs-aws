@@ -6,11 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Jacques Sirot <jsirot@hotmail.com>",
   "license": "MIT",
   "preferGlobal": true,
   "bin": {
-    "beta-ecs-aws": "index.js"
+    "ecs-aws": "index.js"
   },
   "dependencies": {
     "aws-sdk": "^2.156.0",
