@@ -1,7 +1,7 @@
 {
   "name": "ecs-aws",
   "version": "0.3.0",
-  "description": "",
+  "description": "Deploy easily docker containers into AWS ECS",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -12,6 +12,14 @@
   "bin": {
     "ecs-aws": "index.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/samsoul007/ecs-aws.git"
+  },
+  "bugs": {
+    "url": "https://github.com/samsoul007/ecs-aws/issues"
+  },
+  "homepage": "https://github.com/samsoul007/ecs-aws#readme",
   "dependencies": {
     "aws-sdk": "^2.156.0",
     "bluebird": "^3.5.1",
