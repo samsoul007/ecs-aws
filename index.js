@@ -12,6 +12,7 @@ const exec = promisify(require('child_process').exec);
 const child_process = require('child_process');
 const spawn = require('child_process').spawn
 var Table = require('cli-table');
+var commandExists = require('command-exists');
 
 var CLI = require('clui'),
     Spinner = CLI.Spinner;
@@ -20,6 +21,10 @@ var cwd = process.cwd()
 
 var log = function(p_sText){
   console.log(emoji.emojify(p_sText))
+}
+
+var stdout= function(p_sText){
+  process.stdout.write(emoji.emojify(p_sText))
 }
 
 
@@ -387,6 +392,135 @@ var deploy = function(arroProfileData){
   })
 }
 
+var check = function(arroProfileData){
+  log(":fire: Checking configuration settings");
+
+  (function(){
+    stdout("- Docker installation ")
+
+    return commandExists('docker')
+    .then(function(command){
+      stdout(":heavy_check_mark: \n")
+      return true;
+    }).catch(function(){
+      console.log("not found")
+      return Promise.reject("Docker is not installed. Please go to https://docs.docker.com/engine/installation/")
+    });
+  })()
+  .then(function(){
+    stdout("- AWS profile ")
+    return new Promise(function(resolve,reject){
+      var creds = new AWS.SharedIniFileCredentials({profile: arroProfileData.profile});
+      if(!creds.accessKeyId)
+        return reject('Could not find profile "' + value + '"');
+
+      AWS.config.update({region:'eu-west-1'});
+      AWS.config.credentials = creds;
+
+      stdout(":heavy_check_mark: \n")
+      return resolve();
+    })
+  })
+  .then(function(){
+    stdout("- dockerfile exists ")
+    return fileExists(cwd+"/"+arroProfileData.dockerfile).
+    then(function(){
+      stdout(":heavy_check_mark: \n")
+    })
+  })
+  .then(function(){
+    stdout("- repo exists ")
+
+    return new Promise(function(resolve,reject){
+      var ecr = new AWS.ECR();
+      var sRepo = arroProfileData.repo.split("amazonaws.com/")[1]
+      ecr.describeRepositories({repositoryNames:[sRepo]}, function(err, data) {
+        if(err)
+          return reject("Could not find repository '"+sRepo+"'")
+
+        resolve(true)
+      });
+    })
+    .then(function(){
+      stdout(":heavy_check_mark: \n")
+    })
+  })
+  .then(function(){
+    stdout("- task definition exists ")
+
+    return new Promise(function(resolve,reject){
+      var ecs = new AWS.ECS();
+
+      var params = {
+          taskDefinition: arroProfileData.task
+       };
+       ecs.describeTaskDefinition(params, function(err, data) {
+         if(err)
+           return reject("Could not find task definition '"+arroProfileData.task+"'")
+
+         resolve(true)
+       });
+    })
+    .then(function(){
+      stdout(":heavy_check_mark: \n")
+    })
+  })
+  .then(function(){
+    stdout("- cluster exists ")
+
+    return new Promise(function(resolve,reject){
+      var ecs = new AWS.ECS();
+
+      var params = {
+        clusters: [
+          arroProfileData.cluster
+        ]
+       };
+
+       ecs.describeClusters(params, function(err, data) {
+         if(err || !data.clusters.length)
+           return reject("Could not find cluster '"+arroProfileData.cluster.split("cluster/")[1]+"'")
+
+         resolve(true)
+       });
+    })
+    .then(function(){
+      stdout(":heavy_check_mark: \n")
+    })
+  })
+  .then(function(){
+    stdout("- service exists ")
+
+    return new Promise(function(resolve,reject){
+      var ecs = new AWS.ECS();
+
+      var params = {
+        cluster: arroProfileData.cluster,
+        services: [
+          arroProfileData.task
+        ]
+       };
+
+       ecs.describeServices(params, function(err, data) {
+         if(err || !data.services.length)
+           return reject("Could not find service '"+arroProfileData.task+"'")
+
+         resolve(true)
+       });
+    })
+    .then(function(){
+      stdout(":heavy_check_mark: \n")
+    })
+  })
+  .then(function(){
+    log(":+1: All checks validated.")
+  })
+  .catch(function(err){
+    log(':bangbang:  '+err);
+    process.exit();
+  })
+}
+
 var view = function(arroProfileData){
   var description = {
     env : "Environment variables",
@@ -658,6 +792,7 @@ let argv = yargs
   })
   .command('run','Run local container.')
   .command('view','View a configuration table.')
+  .command('check','Check configuration.')
   .command('configure','Change a config file configuration.')
   .command('init','Initialise a config file.')
   .help()
@@ -668,7 +803,14 @@ var sFileName = "ECSConfig"+(sProfile?"_"+sProfile:"")+".json";
 
 if(argv._.indexOf("configure") !== -1){
   loadFile(cwd+"/"+sFileName).then(function(arroProfileData){
-    configure(arroProfileData);
+    check(arroProfileData);
+  }).catch(function(){
+    log(':bangbang:  Could not load the configuration file: '+sFileName);
+    process.exit();
+  })
+}else if(argv._.indexOf("check") !== -1){
+  loadFile(cwd+"/"+sFileName).then(function(arroProfileData){
+    check(arroProfileData);
   }).catch(function(){
     log(':bangbang:  Could not load the configuration file: '+sFileName);
     process.exit();

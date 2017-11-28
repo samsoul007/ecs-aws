@@ -32,9 +32,10 @@ initialise a directory where you want have a Dockerfile and code using `ecs-aws 
 
 after initialisation you can:
 
-* run `ecs-aws run [--profile profilename]` to run the container locally
-* run `ecs-aws configure [--profile profilename]` to change configuration
-* run `ecs-aws view [--profile profilename]` to view the configuration variables
+* `ecs-aws run [--profile profilename]` to run the container locally
+* `ecs-aws check [--profile profilename]` to check the configuration
+* `ecs-aws configure [--profile profilename]` to change configuration
+* `ecs-aws view [--profile profilename]` to view the configuration variables
 
 Other parameters:
 * `--help`: help
