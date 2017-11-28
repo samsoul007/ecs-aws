@@ -1,0 +1,6 @@
+FROM node:6.10.1
+MAINTAINER Dmytro Leonenko, dleonenko@gravity4.com
+
+ADD . /app/
+WORKDIR "/app"
+CMD ["node", "app.js"]
