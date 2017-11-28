@@ -22,13 +22,11 @@ docker & docker-machine: https://docs.docker.com/engine/installation/
 
 ecs-aws allows you to deploy an ECS service without having to modify all the configuration and task definition over and over.
 
-**This script is an alpha version and does not allow the creation of services directly. Set that up in your ECR enviroment or the AWS Console first**
+**This script is an alpha version and does not allow the creation of services directly. Set that up in your ECR environment or the AWS Console first**
 
 **The task definition and container name have to be the same. This will be changed in later versions.**
 
-**Enviroment variables cannot be setup with init. Edit the ECSFile afterwards to add/remove them.**
-
-**A docker file needs to be in the directory. It will be requested during the init and you can have multiple ones in the same directory for different services (etc cronjobs)**
+**A docker file needs to be in the directory. It will be requested during the init and you can have multiple ones in the same directory for different services (ex: scheduled services)**
 
 initialise a directory where you want have a Dockerfile and code using `ecs-aws init --profile [profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure --profile [profilename]`) in order to retrieve the different services and clusters.
 
