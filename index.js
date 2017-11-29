@@ -97,7 +97,7 @@ var commit = function(arroProfileData){
     .then(function(answers){
       return exec("git add .;")
       .then(function(){
-        return exec("git commit -m " + answers.commit);
+        return exec("git commit -m '" + answers.commit+ "'");
       })
       .then(function(){
         return exec("git push origin master;");
@@ -204,6 +204,7 @@ var getAWSAccountID = function(){
 
 var buildImage = function(arroProfileData,tag){
   var sImage = arroProfileData.repo+":"+tag
+  var sProfile = arroProfileData.profile;
   var sRepoName = arroProfileData.repo.split('amazonaws.com/')[1];
   var spinner;
 
@@ -215,19 +216,18 @@ var buildImage = function(arroProfileData,tag){
     spinner = new Spinner("Building image '"+tag+"' from docker file '"+arroProfileData.dockerfile+"'", ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷']);
     spinner.start();
 
-    return spawnP('docker build -f '+arroProfileData.dockerfile+' -t '+ sRepoName +' .')
-  }).then(function(){
+    return exec('docker build -f '+arroProfileData.dockerfile+' -t '+ sRepoName +' .')
+  }).then(function(res){
     spinner.message("Tagging image '"+tag+"' from docker file '"+arroProfileData.dockerfile+"'")
 
-    return spawnP('docker tag '+sRepoName+' '+sImage);
-  }).then(function(){
+    return exec('docker tag '+sRepoName+' '+sImage);
+  }).then(function(res){
     spinner.message("Pushing image '"+tag+"' from docker file '"+arroProfileData.dockerfile+"'")
 
-    return spawnP('docker push '+sImage);
-  }).then(function(){
+    return exec('docker push '+sImage);
+  }).then(function(res){
     spinner.stop();
   })
-
 }
 
 var checkLogGroup = function(arroProfileData){
