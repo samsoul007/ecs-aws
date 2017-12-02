@@ -35,7 +35,10 @@ after initialisation you can:
 * `ecs-aws run [--profile profilename]` to run the container locally
 * `ecs-aws check [--profile profilename]` to check the configuration
 * `ecs-aws configure [--profile profilename]` to change configuration
-* `ecs-aws view [--profile profilename]` to view the configuration variables
+* `ecs-aws info [--profile profilename]` to view the configuration
+* `ecs-aws logs [--profile profilename]` to view the service's logs
+* `ecs-aws events [--profile profilename]` to view the service's events
+
 
 Other parameters:
 * `--help`: help
