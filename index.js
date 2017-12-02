@@ -399,7 +399,9 @@ var deploy = function(arroProfileData){
 }
 
 var events = function(arroProfileData){
-  log(":fire: Retrieving service events");
+  log(":fire: '"+arroProfileData.service.split("service/")[1]+"' service events");
+  spinner = new Spinner("Retrieving events. Please wait...", ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷']);
+  spinner.start();
 
   return new Promise(function(resolve,reject){
     var ecs = new AWS.ECS();
@@ -420,7 +422,7 @@ var events = function(arroProfileData){
         var oEvent = data.services[0].events[i];
         tableObj.push([colors.red(timeAgo(new Date(oEvent.createdAt))),oEvent.message])
       }
-
+      spinner.stop();
       console.log(tableObj.toString())
     });
   })
@@ -473,7 +475,9 @@ var fGetLogEvents = function(logName,streamName){
 }
 
 var logs = function(arroProfileData){
-  log(":fire: Retrieving '"+arroProfileData.service.split("service/")[1]+"' service logs");
+  log(":fire: '"+arroProfileData.service.split("service/")[1]+"' service logs");
+  spinner = new Spinner("Retrieving logs. Please wait...", ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷']);
+  spinner.start();
 
   return getLogStreams(arroProfileData.log)
   .then(function(arrsStreams){
@@ -498,6 +502,7 @@ var logs = function(arroProfileData){
         }
       }
 
+      spinner.stop();
       console.log(tableObj.toString())
     })
   })
@@ -678,7 +683,7 @@ var configure = function(arroProfileData){
       type: 'input',
       name: 'dockerfile',
       message: 'Enter DockerFile name:',
-      default: arroProfileData.dockerfile || "DockerFile",
+      default: arroProfileData.dockerfile || "Dockerfile",
       validate: function(value) {
         var done = this.async();
 
