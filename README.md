@@ -1,4 +1,6 @@
-# ecs-aws
+# ecs-aws [![npm version](https://badge.fury.io/js/ecs-aws.svg)](https://badge.fury.io/js/ecs-aws) 
+
+
 Deploy easily docker containers into AWS ECS
 
 ## disclaimer
