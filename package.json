@@ -1,6 +1,6 @@
 {
   "name": "ecs-aws",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Deploy easily docker containers into AWS ECS",
   "main": "index.js",
   "scripts": {
