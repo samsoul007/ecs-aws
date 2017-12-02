@@ -11,8 +11,10 @@ const promisify = require('util.promisify');
 const exec = promisify(require('child_process').exec);
 const child_process = require('child_process');
 const spawn = require('child_process').spawn
-var Table = require('cli-table');
+var Table = require('cli-table2');
 var commandExists = require('command-exists');
+var timeAgo = require('node-time-ago');
+var colors = require("colors")
 
 var CLI = require('clui'),
     Spinner = CLI.Spinner;
@@ -81,7 +83,7 @@ var loadFile = function(path){
 // var arroProfileData = {};
 
 var commit = function(arroProfileData){
-  log(':fire: Committing');
+  log(':fire: Commit your code.');
 
   return fileExists(cwd+"/.git")
   .catch(function(){
@@ -95,6 +97,9 @@ var commit = function(arroProfileData){
       }
     ])
     .then(function(answers){
+      spinner = new Spinner("Commiting your code. Please wait...", ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷']);
+      spinner.start();
+
       return exec("git add .;")
       .then(function(){
         return exec("git commit -m '" + answers.commit+ "'");
@@ -103,7 +108,9 @@ var commit = function(arroProfileData){
         return exec("git push origin master;");
       })
       .then(function(){
-        log(':fire: End committing');
+        spinner.stop();
+        log(':+1: Code commited');
+
         return true;
       })
     })
@@ -132,7 +139,7 @@ var rebuildNPM = function(arroProfileData){
     })
     .then(function(){
       spinner.stop();
-      log(":white_check_mark: NPM modules finished installing.")
+      log(":+1: NPM modules finished installing.")
       return Promise.resolve(true);
     })
   });
@@ -227,6 +234,7 @@ var buildImage = function(arroProfileData,tag){
     return exec('docker push '+sImage);
   }).then(function(res){
     spinner.stop();
+    log(":+1: Docker image pushed successfully.")
   })
 }
 
@@ -242,7 +250,7 @@ var checkLogGroup = function(arroProfileData){
       })
 
       if(!arroLogs.length){
-        log("AWS log group not existant. Creating...")
+        log(":cyclone: AWS log group not existant. Creating...")
         var params = {
           logGroupName: arroProfileData.log
         }
@@ -250,7 +258,7 @@ var checkLogGroup = function(arroProfileData){
           if(err)
             return reject(err)
 
-          log("AWS log group "+ arroProfileData.log + " successfully created");
+          log(":+1: AWS log group "+ arroProfileData.log + " successfully created");
           return resolve(true);
         });
       }else{
@@ -318,11 +326,9 @@ var checkTag = function(arroProfileData,manual){
 var addEnvVariables = function(arroProfileData){
   var envVariables = arroProfileData.env || [];
 
-
   var fRequest = function(){
     var table = new Table({
       head: ['#','Name', 'Value']
-    , colWidths: [5,25, 25]
     });
 
     for(var i = 0; i < envVariables.length ; i++){
@@ -389,6 +395,111 @@ var deploy = function(arroProfileData){
   })
   .then(function(){
     log(":white_check_mark: Successfully deployed.")
+  })
+}
+
+var events = function(arroProfileData){
+  log(":fire: Retrieving service events");
+
+  return new Promise(function(resolve,reject){
+    var ecs = new AWS.ECS();
+
+    var params = {
+      services: [ /* required */
+        arroProfileData.service
+        /* more items */
+      ],
+      cluster: arroProfileData.cluster
+    };
+    ecs.describeServices(params, function(err, data) {
+      if (err) return reject(err);
+
+      var tableObj = new Table();
+
+      for(let i = data.services[0].events.length-1; i >= 0 ;i--){
+        var oEvent = data.services[0].events[i];
+        tableObj.push([colors.red(timeAgo(new Date(oEvent.createdAt))),oEvent.message])
+      }
+
+      console.log(tableObj.toString())
+    });
+  })
+}
+
+var getLogStreams = function(log){
+  return new Promise(function(resolve,reject){
+    var cloudwatchlogs = new AWS.CloudWatchLogs();
+
+    var params = {
+      logGroupName: log, /* required */
+      descending: true,
+      limit: 20,
+      orderBy: "LastEventTime"
+    };
+    cloudwatchlogs.describeLogStreams(params, function(err, data) {
+      if (err) return reject(err); // an error occurred
+
+      resolve(data.logStreams.map(function(oStream){
+        return oStream.logStreamName;
+      }))
+    });
+  })
+}
+
+var fGetLogEvents = function(logName,streamName){
+  return new Promise(function(resolve,reject){
+    var cloudwatchlogs = new AWS.CloudWatchLogs();
+
+    var params = {
+      logGroupName: logName,
+      logStreamName: streamName
+    };
+    cloudwatchlogs.getLogEvents(params, function(err, data) {
+      if (err) return reject(err); // an error occurred
+
+      var arroEvents = {};
+
+      for(let i = 0 ; i < data.events.length;i++){
+        var oEvent = data.events[i];
+
+        if(!arroEvents[oEvent.timestamp])
+          arroEvents[oEvent.timestamp] = [];
+
+        arroEvents[oEvent.timestamp].push(oEvent.message)
+      }
+      resolve(arroEvents);           // successful response
+    });
+  })
+}
+
+var logs = function(arroProfileData){
+  log(":fire: Retrieving '"+arroProfileData.service.split("service/")[1]+"' service logs");
+
+  return getLogStreams(arroProfileData.log)
+  .then(function(arrsStreams){
+    arrsStreams.reverse();
+    var arroPromises = [];
+    for(let i = 0 ; i < arrsStreams.length;i++){
+      arroPromises.push(fGetLogEvents(arroProfileData.log,arrsStreams[i]))
+    }
+
+    Promise.all(arroPromises)
+    .then(function(arroData){
+
+      var tableObj = new Table();
+
+      for(let i = 0; i < arroData.length ;i++){
+        tableObj.push([{colSpan:2,content:colors.green("Log stream")}])
+        for(let key in arroData[i]){
+          var arrsMessage = arroData[i][key];
+          var oDate = new Date();
+          oDate.setTime(key);
+          tableObj.push([colors.red(timeAgo(oDate)),arrsMessage.join("\n")])
+        }
+      }
+
+      console.log(tableObj.toString())
+    })
   })
 }
 
@@ -542,14 +653,12 @@ var view = function(arroProfileData){
 
   var table = new Table({
     head: ['Name', 'Value']
-  , colWidths: [25, 100]
   });
 
   for(var key in arroProfileData){
     if(key == "env"){
       var tableObj = new Table({
         head: ['#','Name', 'Value']
-      , colWidths: [5,25, 25]
       });
 
       for(var i = 0; i < arroProfileData[key].length;i++){
@@ -753,7 +862,7 @@ var configure = function(arroProfileData){
     _.extend(arroProfileData,answers);
 
     return new Promise(function(resolve,reject){
-      fs.writeFile('ECSConfig.json', JSON.stringify(arroProfileData), function (err) {
+      fs.writeFile(sFileName, JSON.stringify(arroProfileData), function (err) {
         if(err)
           return reject("Could not save configuration file.")
 
@@ -767,6 +876,31 @@ var configure = function(arroProfileData){
   .catch(function(err){
     log(':bangbang:  '+err);
     process.exit();
+  })
+}
+
+var loadAWSProfile = function(arroProfileData){
+  return new Promise(function(resolve,reject){
+    var creds = new AWS.SharedIniFileCredentials({profile: arroProfileData.profile});
+    if(!creds.accessKeyId)
+      return reject('Could not find profile "' + value + '"');
+
+    AWS.config.update({region:'eu-west-1'});
+    AWS.config.credentials = creds;
+
+    return resolve(arroProfileData);
+  })
+}
+
+var logError=function(err){
+  log(':bangbang:  '+err);
+  process.exit();
+}
+
+var loadConfigFile = function(sFileName){
+  return loadFile(cwd+"/"+sFileName)
+  .catch(function(){
+    return Promise.reject('Could not load the configuration file: '+sFileName);
   })
 }
 
@@ -791,7 +925,9 @@ let argv = yargs
       demandOption: false
   })
   .command('run','Run local container.')
-  .command('view','View a configuration table.')
+  .command('info','View a configuration table.')
+  .command('events','View service events.')
+  .command('logs','View service logs.')
   .command('check','Check configuration.')
   .command('configure','Change a config file configuration.')
   .command('init','Initialise a config file.')
@@ -802,40 +938,38 @@ var sProfile = argv.profile || "";
 var sFileName = "ECSConfig"+(sProfile?"_"+sProfile:"")+".json";
 
 if(argv._.indexOf("configure") !== -1){
-  loadFile(cwd+"/"+sFileName).then(function(arroProfileData){
-    check(arroProfileData);
-  }).catch(function(){
-    log(':bangbang:  Could not load the configuration file: '+sFileName);
-    process.exit();
-  })
+  loadConfigFile(sFileName)
+  .then(configure)
+  .catch(logError)
 }else if(argv._.indexOf("check") !== -1){
-  loadFile(cwd+"/"+sFileName).then(function(arroProfileData){
-    check(arroProfileData);
-  }).catch(function(){
-    log(':bangbang:  Could not load the configuration file: '+sFileName);
-    process.exit();
-  })
-}else if(argv._.indexOf("view") !== -1){
-  loadFile(cwd+"/"+sFileName).then(function(arroProfileData){
-    view(arroProfileData);
-  }).catch(function(){
-    log(':bangbang:  Could not load the configuration file: '+sFileName);
-    process.exit();
-  })
+  loadConfigFile(sFileName)
+  .then(check)
+  .catch(logError)
+}else if(argv._.indexOf("events") !== -1){
+  loadConfigFile(sFileName)
+  .then(loadAWSProfile)
+  .then(events)
+  .catch(logError)
+}else if(argv._.indexOf("logs") !== -1){
+  loadConfigFile(sFileName)
+  .then(loadAWSProfile)
+  .then(logs)
+  .catch(logError)
+}else if(argv._.indexOf("info") !== -1){
+  loadConfigFile(sFileName)
+  .then(view)
+  .catch(logError)
 }else if(argv._.indexOf("init") !== -1){
   fileExists(sFileName)
   .then(function(){
-    log(":bangbang:  Configuration file "+sFileName+" already exists, please use --configure to edit it.");
+    logError("Configuration file "+sFileName+" already exists, please use --configure to edit it.");
   })
   .catch(function(){
     configure({});
   })
 }else if(argv._.indexOf("run") !== -1){
   var oProfile;
-  loadFile(cwd+"/"+sFileName)
-  .catch(function(){
-    return Promise.reject('Could not load the configuration file: '+sFileName);
-  })
+  loadConfigFile(sFileName)
   .then(function(arroProfileData){
     oProfile = arroProfileData;
     return exec("docker-machine ip")
@@ -847,20 +981,8 @@ if(argv._.indexOf("configure") !== -1){
     process.exit();
   })
 }else{
-  loadFile(cwd+"/"+sFileName)
-  .catch(function(){
-    return Promise.reject("Could not load the configuration file: "+sFileName);
-  })
-  .then(function(arroProfileData){
-    var creds = new AWS.SharedIniFileCredentials({profile: arroProfileData.profile});
-    if(!creds.accessKeyId)
-      return Promise.reject('Could not find profile "' + value + '"');
-
-    AWS.config.update({region:'eu-west-1'});
-    AWS.config.credentials = creds;
-
-    return arroProfileData;
-  })
+  loadConfigFile(sFileName)
+  .then(loadAWSProfile)
   .then(function(arroProfileData){
     if(argv.c){
       return commit(arroProfileData);
@@ -875,8 +997,5 @@ if(argv._.indexOf("configure") !== -1){
 
     return arroProfileData;
   })
-  .catch(function(err){
-    log(':bangbang:  '+err);
-    process.exit();
-  })
+  .catch(logError)
 }
