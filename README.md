@@ -31,10 +31,11 @@ ecs-aws allows you to deploy an ECS service without having to modify all the con
 initialise a directory where you want have a Dockerfile and code using `ecs-aws init --profile [profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure --profile [profilename]`) in order to retrieve the different services and clusters.
 
 after initialisation you can:
-
-* `ecs-aws run [--profile profilename]` to run the container locally
-* `ecs-aws check [--profile profilename]` to check the configuration
 * `ecs-aws configure [--profile profilename]` to change configuration
+* `ecs-aws deploy [--profile profilename]` to deploy the code into ECR & ECS (will use the GIT short hash as version if available)
+* `ecs-aws run [--profile profilename]` to run the container locally
+* `ecs-aws commit [--profile profilename]` commit your code changes
+* `ecs-aws check [--profile profilename]` to check the configuration
 * `ecs-aws info [--profile profilename]` to view the configuration
 * `ecs-aws logs [--profile profilename]` to view the service's logs
 * `ecs-aws events [--profile profilename]` to view the service's events
@@ -42,8 +43,8 @@ after initialisation you can:
 
 Other parameters:
 * `--help`: help
-* `-c`: commit your code changes
-* `-d`: deploy the code into ECR (will use the GIT short hash as version if available)
+* `-c`: alias to `ecs-aws commit`
+* `-d`: alias to `ecs-aws deploy`
 
 
 ## TO-DO

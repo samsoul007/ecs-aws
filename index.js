@@ -100,8 +100,8 @@ var commit = function(arroProfileData){
       spinner = new Spinner("Commiting your code. Please wait...", ['⣾','⣽','⣻','⢿','⡿','⣟','⣯','⣷']);
       spinner.start();
 
-      return exec("git add .;")
-      .then(function(){
+      return exec("git add .")
+      .then(function(res){
         return exec("git commit -m '" + answers.commit+ "'");
       })
       .then(function(){
@@ -924,6 +924,7 @@ let argv = yargs
       describe: "Deploy container.",
       demandOption: false
   })
+  .command('deploy','Deploy the code into ECR & ECS (will use the GIT short hash as version if available)')
   .command('run','Run local container.')
   .command('info','View a configuration table.')
   .command('events','View service events.')
@@ -940,6 +941,16 @@ var sFileName = "ECSConfig"+(sProfile?"_"+sProfile:"")+".json";
 if(argv._.indexOf("configure") !== -1){
   loadConfigFile(sFileName)
   .then(configure)
+  .catch(logError)
+}else if(argv._.indexOf("deploy") !== -1){
+  loadConfigFile(sFileName)
+  .then(loadAWSProfile)
+  .then(deploy)
+  .catch(logError)
+}else if(argv._.indexOf("commit") !== -1){
+  loadConfigFile(sFileName)
+  .then(loadAWSProfile)
+  .then(commit)
   .catch(logError)
 }else if(argv._.indexOf("check") !== -1){
   loadConfigFile(sFileName)
@@ -981,10 +992,13 @@ if(argv._.indexOf("configure") !== -1){
     process.exit();
   })
 }else{
+
+  var bValidCommand = false;
   loadConfigFile(sFileName)
   .then(loadAWSProfile)
   .then(function(arroProfileData){
     if(argv.c){
+      bValidCommand = true;
       return commit(arroProfileData);
     }
 
@@ -992,10 +1006,16 @@ if(argv._.indexOf("configure") !== -1){
   })
   .then(function(arroProfileData){
     if(argv.d){
+      bValidCommand = true;
       return deploy(arroProfileData);
     }
 
     return arroProfileData;
+  })
+  .then(function(){
+    if(!bValidCommand){
+      yargs.showHelp()
+    }
   })
   .catch(logError)
 }
