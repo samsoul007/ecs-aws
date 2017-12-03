@@ -1,4 +1,4 @@
-# ecs-aws [![npm version](https://badge.fury.io/js/ecs-aws.svg)](https://badge.fury.io/js/ecs-aws) 
+# ecs-aws [![npm version](https://badge.fury.io/js/ecs-aws.svg)](https://badge.fury.io/js/ecs-aws)
 
 
 Deploy easily docker containers into AWS ECS
@@ -41,6 +41,7 @@ after initialisation you can:
 * `ecs-aws info [--profile profilename]` to view the configuration
 * `ecs-aws logs [--profile profilename]` to view the service's logs
 * `ecs-aws events [--profile profilename]` to view the service's events
+* `ecs-aws dash [--profile profilename]` to view the dashboard [BETA]
 
 
 Other parameters:
