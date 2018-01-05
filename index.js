@@ -223,6 +223,7 @@ var buildImage = function(arroProfileData, tag) {
 
   return exec('aws ecr get-login --no-include-email ' + (sProfile ? " --profile " + sProfile : ""))
     .then(function(result) {
+      result = result.replace("-e none","")
       return exec(result);
 
     }).then(function(res) {
