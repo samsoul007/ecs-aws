@@ -35,7 +35,7 @@ ecs-aws allows you to deploy an ECS service without having to modify all the con
 
 **A docker file needs to be in the directory. It will be requested during the init and you can have multiple ones in the same directory for different services (ex: scheduled services)**
 
-initialise a directory where you want have a Dockerfile and code using `ecs-aws init --profile [profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure --profile [profilename]`) in order to retrieve the different services and clusters.
+Initialise a directory where you have a Dockerfile and code using `ecs-aws init [--profile profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure [--profile profilename]`) in order to retrieve the different services and clusters. The script will create `ECSConfig[profilename].json` in the directory after setup.
 
 after initialisation you can:
 * `ecs-aws configure [--profile profilename]` to change configuration

@@ -144,6 +144,11 @@ var rebuildNPM = function(arroProfileData) {
 }
 
 var updateService = function(arroProfileData, sTag) {
+  if(!arroProfileData.task){
+    log(":cyclone: No task definition to update");
+    return Promise.resolve(true)
+  }
+
   log(":cyclone: Updating task definition " + arroProfileData.task);
   var definition = {
     "networkMode": "bridge",
@@ -213,13 +218,16 @@ var buildImage = function(arroProfileData, tag) {
   var sRepoName = arroProfileData.repo.split('amazonaws.com/')[1];
   var spinner;
 
-  log(":closed_lock_with_key: Login into ECR")
-  return exec('aws ecr get-login' + (sProfile ? " --profile " + sProfile : ""))
+  spinner = new Spinner("Connecting to ECR", ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
+  spinner.start();
+
+  return exec('aws ecr get-login --no-include-email ' + (sProfile ? " --profile " + sProfile : ""))
     .then(function(result) {
+      result = result.replace("-e none","")
       return exec(result);
+
     }).then(function(res) {
-      spinner = new Spinner("Building image '" + tag + "' from docker file '" + arroProfileData.dockerfile + "'", ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
-      spinner.start();
+      spinner.message("Building image '" + tag + "' from docker file '" + arroProfileData.dockerfile + "'", ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
 
       return exec('docker build -f ' + arroProfileData.dockerfile + ' -t ' + sRepoName + ' .')
     }).then(function(res) {
@@ -366,7 +374,7 @@ var addEnvVariables = function(arroProfileData) {
 }
 
 var deploy = function(arroProfileData) {
-  log(':rocket: Deploying');
+  log(':rocket: Starting deployement');
 
   var sAccount = false;
   var sTag = false;
@@ -830,12 +838,12 @@ var configure = function(arroProfileData) {
         name: 'service',
         message: 'Select service:',
         default: arroProfileData.service || null,
-        choices: tasks.map(function(service) {
+        choices: [{name:"cronjob",value:false}].concat(tasks.map(function(service) {
           return {
             name: service.split("service/")[1],
             value: service
           }
-        }).sort(compare),
+        }).sort(compare)),
       })
     })
     .then(answers => {

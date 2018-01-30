@@ -4,15 +4,16 @@ var moment = require("moment");
 
 module.exports = function(arroProfileData) {
   var iSecondInterval = 20;
-  // return getServiceData(arroProfileData).then(function(data){console.log(data.services[0])});
 
   var blessed = require('blessed'),
     contrib = require('blessed-contrib'),
-    screen = blessed.screen(),
+    screen = blessed.screen({
+      title: arroProfileData.task
+    }),
     grid = new contrib.grid({
       rows: 12,
       cols: 12,
-      screen: screen
+      screen: screen,
     })
 
   screen.key(['escape', 'q', 'C-c'], function(ch, key) {
@@ -120,8 +121,7 @@ module.exports = function(arroProfileData) {
     style: {
       line: "yellow",
       text: "green",
-      baseline: "green",
-      bg: 'black'
+      baseline: "green"
     },
     xLabelPadding: 3,
     xPadding: 5,
@@ -139,8 +139,7 @@ module.exports = function(arroProfileData) {
     style: {
       line: "yellow",
       text: "green",
-      baseline: "green",
-      bg: 'black'
+      baseline: "green"
     },
     xLabelPadding: 3,
     xPadding: 5,
