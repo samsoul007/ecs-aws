@@ -1,5 +1,4 @@
 #! /usr/bin/env node
-
 var inquirer = require('inquirer');
 var AWS = require("aws-sdk");
 var fs = require("fs");
@@ -8,7 +7,7 @@ var _ = require("lodash");
 var yargs = require('yargs');
 var emoji = require('node-emoji');
 const promisify = require('util.promisify');
-const exec = promisify(require('child_process').exec);
+const MainExec = promisify(require('child_process').exec);
 const child_process = require('child_process');
 const spawn = require('child_process').spawn
 var Table = require('cli-table2');
@@ -28,6 +27,12 @@ var log = function(p_sText) {
 
 var stdout = function(p_sText) {
   process.stdout.write(emoji.emojify(p_sText))
+}
+
+var exec = function(){
+  return MainExec.apply(null, arguments).then(function(res){
+    return res.stdout;
+  });
 }
 
 
@@ -170,7 +175,7 @@ var updateService = function(arroProfileData, sTag) {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": arroProfileData.log,
-          "awslogs-region": AWS.config.region
+          "awslogs-region": arroProfileData.region || AWS.config.region
         }
       },
       "essential": true,
@@ -535,7 +540,7 @@ var check = function(arroProfileData) {
           return reject('Could not find profile "' + value + '"');
 
         AWS.config.update({
-          region: 'eu-west-1'
+          region: arroProfileData.region || 'eu-west-1'
         });
         AWS.config.credentials = creds;
 
@@ -660,7 +665,8 @@ var view = function(arroProfileData) {
     cluster: "Cluster ARN",
     repo: "Repository URL",
     profile: "AWS Profile",
-    dockerfile: "Docker file path"
+    dockerfile: "Docker file path",
+    region: "Region"
   }
 
 
@@ -714,9 +720,11 @@ var configure = function(arroProfileData) {
           profile: value
         });
         if (creds.accessKeyId) {
+          //Needs a region to get started
           AWS.config.update({
-            region: 'eu-west-1'
+            region: "eu-west-1"
           });
+
           AWS.config.credentials = creds;
           return done(null, true);
         } else {
@@ -729,6 +737,44 @@ var configure = function(arroProfileData) {
     .then(answers => {
       _.extend(arroProfileData, answers);
 
+      var ec2 = new AWS.EC2();
+      log(":cyclone: Loading Regions ...");
+      return new Promise(function(resolve, reject) {
+        ec2.describeRegions({
+        }, function(err, data) {
+          if (err) {
+            return reject("Problem loading regions");
+          }
+
+          if(!data.Regions || !data.Regions.length){
+            return reject("No regions found");
+          }
+
+          resolve(data.Regions);
+        });
+      })
+    })
+    .then(regions => {
+      return inquirer.prompt({
+        type: 'list',
+        name: 'region',
+        message: 'Select region:',
+        default: arroProfileData.region || null,
+        choices: regions.map(function(region) {
+          return {
+            name: region.RegionName,
+            value: region.RegionName
+          }
+        }).sort(compare),
+      })
+    })
+    .then(answers => {
+      _.extend(arroProfileData, answers);
+
+      AWS.config.update({
+        region: arroProfileData.region
+      });
+
       var ecr = new AWS.ECR();
       log(":cyclone: Loading ECR repositories ...");
       return new Promise(function(resolve, reject) {
@@ -738,6 +784,11 @@ var configure = function(arroProfileData) {
           if (err) {
             reject("Problem loading repositories");
           }
+
+          if(!data.repositories || !data.repositories.length){
+            return reject("No repositories found");
+          }
+
           resolve(data.repositories);
         });
       })
@@ -768,6 +819,11 @@ var configure = function(arroProfileData) {
           if (err) {
             reject("Problem loading clusters");
           }
+
+          if(!data.clusterArns || !data.clusterArns.length){
+            return reject("No clusters found");
+          }
+
           resolve(data.clusterArns);
         });
       })
@@ -933,8 +989,9 @@ var loadAWSProfile = function(arroProfileData) {
       return reject('Could not find profile "' + value + '"');
 
     AWS.config.update({
-      region: 'eu-west-1'
+      region: arroProfileData.region || 'eu-west-1'
     });
+
     AWS.config.credentials = creds;
 
     return resolve(arroProfileData);
