@@ -38,23 +38,47 @@ ecs-aws allows you to deploy an ECS service without having to modify all the con
 Initialise a directory where you have a Dockerfile and code using `ecs-aws init [--profile profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure [--profile profilename]`) in order to retrieve the different services and clusters. The script will create `ECSConfig[profilename].json` in the directory after setup.
 
 after initialisation you can:
+
+#### configuration
 * `ecs-aws configure [--profile profilename]` to change configuration
-* `ecs-aws deploy [--profile profilename]` to deploy the code into ECR & ECS (will use the GIT short hash as version if available)
-* `ecs-aws run [--profile profilename]` to run the container locally
-* `ecs-aws commit [--profile profilename]` commit your code changes
 * `ecs-aws check [--profile profilename]` to check the configuration
 * `ecs-aws info [--profile profilename]` to view the configuration
+
+#### deployment
+* `ecs-aws deploy [--profile profilename]` to deploy the code into ECR & ECS (The GIT short hash will be used as version if available)
+
+#### service commit
+* `ecs-aws commit [--profile profilename]` commit your code changes
+
+**This command is available if the directory is a GIT repository**
+
+#### service info
 * `ecs-aws logs [--profile profilename]` to view the service's logs
 * `ecs-aws events [--profile profilename]` to view the service's events
 * `ecs-aws dash [--profile profilename]` to view the dashboard [BETA]
 
 
-Other parameters:
+#### local testing
+* `ecs-aws run [--profile profilename]` to run the container locally
+* `ecs-aws rebuild [--profile profilename]` to rebuild the container image
+
+
+#### Other parameters:
 * `--help`: help
 * `-c`: alias to `ecs-aws commit`
 * `-d`: alias to `ecs-aws deploy`
 
-## dashboard
+## Run your container locally
+
+The old ecs-aws versions used to generate an image everytime `ecs-aws run` was launched and removed it afterwards. This is no longer the case; ecs-aws will create a container image from the `Dockerfile` setup in the configuration profile and keep it after the script has stopped.
+
+This allows for a faster and more reliable testing with a full usage of the Dockerfile.
+
+If the Dockerfile has been modified run `ecs-aws rebuild [--profile profilename]` to rebuild the docker image to the latest version.
+
+**The local testing will use the maximum memory set in the configuration profile file**
+
+## Dashboard
 
 A beta version of the dashboard is available by calling `ecs-aws dash [--profile profilename]`
 

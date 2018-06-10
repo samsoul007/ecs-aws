@@ -650,6 +650,28 @@ var check = function(arroProfileData) {
     })
 }
 
+var rebuild = function(oProfile){
+  var sImage = (oProfile.profile+"/"+oProfile.task+"/"+oProfile.dockerfile+":ecs-aws").toLowerCase();
+
+  return Promise.resolve()
+  .then(function(){
+    child_process.execSync("docker image remove '"+sImage+"'", {
+      stdio: "inherit"
+    })
+    return true;
+  })
+  .then(function(){
+    log(":arrow_forward:  Rebuilding container image "+sImage+". Creating from '"+ oProfile.dockerfile+"'.");
+    child_process.spawnSync("docker", ("build -t "+sImage+" -f "+oProfile.dockerfile+" .").split(" "), {
+      stdio: "inherit"
+    })
+    return true;
+  })
+  .then(function(){
+    log(":+1: Image successfully rebuilt.")
+  })
+}
+
 var view = function(arroProfileData) {
   var description = {
     env: "Environment variables",
@@ -1032,6 +1054,7 @@ let argv = yargs
   })
   .command('deploy', 'Deploy the code into ECR & ECS (will use the GIT short hash as version if available)')
   .command('run', 'Run local container.')
+  .command('rebuild', 'Rebuild the image container from the Dockerfile.')
   .command('info', 'View a configuration table.')
   .command('events', 'View service events.')
   .command('dash', 'Dashboard (beta)')
@@ -1177,6 +1200,10 @@ if (argv._.indexOf("dash") !== -1) {
     .catch(function() {
       configure({});
     })
+} else if (argv._.indexOf("rebuild") !== -1) {
+  loadConfigFile(sFileName)
+    .then(rebuild)
+    .catch(logError)
 } else if (argv._.indexOf("run") !== -1) {
   var oProfile;
   loadConfigFile(sFileName)
@@ -1184,10 +1211,34 @@ if (argv._.indexOf("dash") !== -1) {
       oProfile = arroProfileData;
       return exec("docker-machine ip")
     }).then(function(ip) {
-      log(":arrow_forward:  Running local container on http://" + ip.trim() + ":" + oProfile.local_port + " with docker image '" + oProfile.test_image + "'");
-      child_process.spawnSync("docker", ("run --rm --name " + oProfile.task + " --publish " + oProfile.local_port + ":" + oProfile.app_port + " -ti -w /app -v " + process.cwd() + ":/app " + oProfile.test_image + " bash").split(" "), {
-        stdio: "inherit"
-      })
+
+      var sImage = (oProfile.profile+"/"+oProfile.task+"/"+oProfile.dockerfile+":ecs-aws").toLowerCase();
+
+      exec('docker images '+sImage)
+        .then(function(result) {
+          return result.split("\n").length === 3?true:false;
+        })
+        .then(function(imageExists){
+          if(imageExists){
+            return true;
+          }else{
+            log(":arrow_forward:  Container image "+sImage+" doesn't exists. Creating from '"+ oProfile.dockerfile+"' - this is a one time operation. To rebuild your image run ecs-aws rebuild afterwards.");
+            child_process.spawnSync("docker", ("build -t "+sImage+" -f "+oProfile.dockerfile+" .").split(" "), {
+              stdio: "inherit"
+            })
+            return true;
+          }
+        })
+        .then(function(){
+          return new Promise(function(resolve){
+            log(":arrow_forward:  Running local container on " + ip.trim() + ":" + oProfile.local_port + " with docker image '" + sImage + "' ["+oProfile.container_memory+"MB]");
+            var sCMD = "docker run --shm-size "+oProfile.container_memory+"m  --publish " + oProfile.local_port + ":" + oProfile.app_port + " -ti -w /app -v " + process.cwd() + ":/app '" + sImage + "' bash";
+            var oData = child_process.execSync(sCMD, {
+              stdio: "inherit"
+            })
+            resolve();
+          })
+        })
     }).catch(function(err) {
       log(':bangbang:  ' + err);
       process.exit();
