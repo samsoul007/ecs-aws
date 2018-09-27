@@ -1,4 +1,5 @@
 #! /usr/bin/env node
+
 var inquirer = require('inquirer');
 var AWS = require("aws-sdk");
 var fs = require("fs");
@@ -29,8 +30,8 @@ var stdout = function(p_sText) {
   process.stdout.write(emoji.emojify(p_sText))
 }
 
-var exec = function(){
-  return MainExec.apply(null, arguments).then(function(res){
+var exec = function() {
+  return MainExec.apply(null, arguments).then(function(res) {
     return res.stdout;
   });
 }
@@ -149,7 +150,7 @@ var rebuildNPM = function(arroProfileData) {
 }
 
 var updateService = function(arroProfileData, sTag) {
-  if(!arroProfileData.task){
+  if (!arroProfileData.task) {
     log(":cyclone: No task definition to update");
     return Promise.resolve(true)
   }
@@ -175,7 +176,7 @@ var updateService = function(arroProfileData, sTag) {
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": arroProfileData.log,
-          "awslogs-region": arroProfileData.region || AWS.config.region
+          "awslogs-region": arroProfileData.region ||  AWS.config.region
         }
       },
       "essential": true,
@@ -228,7 +229,7 @@ var buildImage = function(arroProfileData, tag) {
 
   return exec('aws ecr get-login --no-include-email ' + (sProfile ? " --profile " + sProfile : ""))
     .then(function(result) {
-      result = result.replace("-e none","")
+      result = result.replace("-e none", "")
       return exec(result);
 
     }).then(function(res) {
@@ -540,7 +541,7 @@ var check = function(arroProfileData) {
           return reject('Could not find profile "' + value + '"');
 
         AWS.config.update({
-          region: arroProfileData.region || 'eu-west-1'
+          region: arroProfileData.region ||  'eu-west-1'
         });
         AWS.config.credentials = creds;
 
@@ -650,26 +651,26 @@ var check = function(arroProfileData) {
     })
 }
 
-var rebuild = function(oProfile){
-  var sImage = (oProfile.profile+"/"+oProfile.task+"/"+oProfile.dockerfile+":ecs-aws").toLowerCase();
+var rebuild = function(oProfile) {
+  var sImage = (oProfile.profile + "/" + oProfile.task + "/" + oProfile.dockerfile + ":ecs-aws").toLowerCase();
 
   return Promise.resolve()
-  .then(function(){
-    child_process.execSync("docker image remove '"+sImage+"'", {
-      stdio: "inherit"
+    .then(function() {
+      child_process.execSync("docker image remove '" + sImage + "' --force", {
+        stdio: "inherit"
+      })
+      return true;
     })
-    return true;
-  })
-  .then(function(){
-    log(":arrow_forward:  Rebuilding container image "+sImage+". Creating from '"+ oProfile.dockerfile+"'.");
-    child_process.spawnSync("docker", ("build -t "+sImage+" -f "+oProfile.dockerfile+" .").split(" "), {
-      stdio: "inherit"
+    .then(function() {
+      log(":arrow_forward:  Rebuilding container image " + sImage + ". Creating from '" + oProfile.dockerfile + "'.");
+      child_process.spawnSync("docker", ("build -t " + sImage + " -f " + oProfile.dockerfile + " .").split(" "), {
+        stdio: "inherit"
+      })
+      return true;
     })
-    return true;
-  })
-  .then(function(){
-    log(":+1: Image successfully rebuilt.")
-  })
+    .then(function() {
+      log(":+1: Image successfully rebuilt.")
+    })
 }
 
 var view = function(arroProfileData) {
@@ -762,13 +763,12 @@ var configure = function(arroProfileData) {
       var ec2 = new AWS.EC2();
       log(":cyclone: Loading Regions ...");
       return new Promise(function(resolve, reject) {
-        ec2.describeRegions({
-        }, function(err, data) {
+        ec2.describeRegions({}, function(err, data) {
           if (err) {
             return reject("Problem loading regions");
           }
 
-          if(!data.Regions || !data.Regions.length){
+          if (!data.Regions ||  !data.Regions.length) {
             return reject("No regions found");
           }
 
@@ -807,7 +807,7 @@ var configure = function(arroProfileData) {
             reject("Problem loading repositories");
           }
 
-          if(!data.repositories || !data.repositories.length){
+          if (!data.repositories ||  !data.repositories.length) {
             return reject("No repositories found");
           }
 
@@ -842,7 +842,7 @@ var configure = function(arroProfileData) {
             reject("Problem loading clusters");
           }
 
-          if(!data.clusterArns || !data.clusterArns.length){
+          if (!data.clusterArns ||  !data.clusterArns.length) {
             return reject("No clusters found");
           }
 
@@ -916,7 +916,10 @@ var configure = function(arroProfileData) {
         name: 'service',
         message: 'Select service:',
         default: arroProfileData.service || null,
-        choices: [{name:"cronjob",value:false}].concat(tasks.map(function(service) {
+        choices: [{
+          name: "cronjob",
+          value: false
+        }].concat(tasks.map(function(service) {
           return {
             name: service.split("service/")[1],
             value: service
@@ -1011,7 +1014,7 @@ var loadAWSProfile = function(arroProfileData) {
       return reject('Could not find profile "' + value + '"');
 
     AWS.config.update({
-      region: arroProfileData.region || 'eu-west-1'
+      region: arroProfileData.region ||  'eu-west-1'
     });
 
     AWS.config.credentials = creds;
@@ -1114,23 +1117,29 @@ getServiceData = function(arroProfileData) {
   })
 }
 
-fGetStats = function(arroProfileData,metricName){
-  return new Promise(function(resolve,reject){
+fGetStats = function(arroProfileData, metricName) {
+  return new Promise(function(resolve, reject) {
     var cloudwatch = new AWS.CloudWatch();
 
     var params = {
-      EndTime: new Date(), /* required */
-      MetricName: metricName, /* required */
-      Namespace: 'AWS/ECS', /* required */
-      Period: 5, /* required */
-      StartTime: moment().subtract(20,"minutes").unix(), /* required */
-      Dimensions: [
-        {
-          Name: 'ClusterName', /* required */
+      EndTime: new Date(),
+      /* required */
+      MetricName: metricName,
+      /* required */
+      Namespace: 'AWS/ECS',
+      /* required */
+      Period: 5,
+      /* required */
+      StartTime: moment().subtract(20, "minutes").unix(),
+      /* required */
+      Dimensions: [{
+          Name: 'ClusterName',
+          /* required */
           Value: arroProfileData.cluster.split("cluster/")[1] /* required */
         },
         {
-          Name: 'ServiceName', /* required */
+          Name: 'ServiceName',
+          /* required */
           Value: arroProfileData.service.split("service/")[1] /* required */
         }
         /* more items */
@@ -1147,10 +1156,13 @@ fGetStats = function(arroProfileData,metricName){
       if (err) return reject(err); // an error occurred
 
       resolve(data.Datapoints
-      .map(function(dp){ dp.Timestamp = new Date(dp.Timestamp) ; return dp})
-      .sort(function(a, b) {
-        return a.Timestamp - b.Timestamp;
-      }));
+        .map(function(dp) {
+          dp.Timestamp = new Date(dp.Timestamp);
+          return dp
+        })
+        .sort(function(a, b) {
+          return a.Timestamp - b.Timestamp;
+        }));
     });
   })
 }
@@ -1212,31 +1224,35 @@ if (argv._.indexOf("dash") !== -1) {
       return exec("docker-machine ip")
     }).then(function(ip) {
 
-      var sImage = (oProfile.profile+"/"+oProfile.task+"/"+oProfile.dockerfile+":ecs-aws").toLowerCase();
+      var sImage = (oProfile.profile + "/" + oProfile.task + "/" + oProfile.dockerfile + ":ecs-aws").toLowerCase();
 
-      exec('docker images '+sImage)
+      return exec('docker images ' + sImage)
         .then(function(result) {
-          return result.split("\n").length === 3?true:false;
+          return result.split("\n").length === 3 ? true : false;
         })
-        .then(function(imageExists){
-          if(imageExists){
+        .then(function(imageExists) {
+          if (imageExists) {
             return true;
-          }else{
-            log(":arrow_forward:  Container image "+sImage+" doesn't exists. Creating from '"+ oProfile.dockerfile+"' - this is a one time operation. To rebuild your image run ecs-aws rebuild afterwards.");
-            child_process.spawnSync("docker", ("build -t "+sImage+" -f "+oProfile.dockerfile+" .").split(" "), {
+          } else {
+            log(":arrow_forward:  Container image " + sImage + " doesn't exists. Creating from '" + oProfile.dockerfile + "' - this is a one time operation. To rebuild your image run ecs-aws rebuild afterwards.");
+            child_process.spawnSync("docker", ("build -t " + sImage + " -f " + oProfile.dockerfile + " .").split(" "), {
               stdio: "inherit"
             })
             return true;
           }
         })
-        .then(function(){
-          return new Promise(function(resolve){
-            log(":arrow_forward:  Running local container on " + ip.trim() + ":" + oProfile.local_port + " with docker image '" + sImage + "' ["+oProfile.container_memory+"MB]");
-            var sCMD = "docker run --shm-size "+oProfile.container_memory+"m  --publish " + oProfile.local_port + ":" + oProfile.app_port + " -ti -w /app -v " + process.cwd() + ":/app '" + sImage + "' bash";
-            var oData = child_process.execSync(sCMD, {
-              stdio: "inherit"
-            })
-            resolve();
+        .then(function() {
+          return new Promise(function(resolve, reject) {
+            log(":arrow_forward:  Running local container on " + ip.trim() + ":" + oProfile.local_port + " with docker image '" + sImage + "' [" + oProfile.container_memory + "MB]");
+            var sCMD = "docker run --shm-size " + oProfile.container_memory + "m  --publish " + oProfile.local_port + ":" + oProfile.app_port + " -ti -w /app -v " + process.cwd() + ":/app '" + sImage + "' bash";
+            try {
+              var oData = child_process.execSync(sCMD, {
+                stdio: "inherit"
+              })
+              resolve();
+            } catch (e) {
+              resolve();
+            }
           })
         })
     }).catch(function(err) {
