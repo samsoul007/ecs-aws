@@ -213,9 +213,9 @@ const updateService = (arroProfileData, sTag) => {
           'awslogs-region': arroProfileData.region || AWS.config.region,
         },
       },
-      // linuxParameters:{
-      //   sharedMemorySize: arroProfileData.container_memory
-      // },
+      linuxParameters:{
+        sharedMemorySize: arroProfileData.container_memory
+      },
       essential: true,
       volumesFrom: []
     }],
