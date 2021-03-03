@@ -60,7 +60,11 @@ const stdout = (sText) => {
   process.stdout.write(emoji.emojify(sText));
 };
 
-const exec = (...args) => MainExec(...args).then(res => res.stdout);
+const exec = (...args) => MainExec(...args)
+
+/*.then(res => {
+  console.log(res)
+  return res.stdout});*/
 
 
 const spawnP = (cmd, verbose) => new Promise(((resolve) => {
@@ -926,7 +930,6 @@ if (argv._.indexOf('dash') !== -1) {
       return exec('docker-machine ip');
     }).then((ip) => {
       const sImage = (`${oProfile.profile}/${oProfile.task}/${oProfile.dockerfile}:ecs-aws`).toLowerCase();
-
       return exec(`docker images ${sImage}`)
         .then(result => result.split('\n').length === 3)
         .then((imageExists) => {
@@ -952,6 +955,7 @@ if (argv._.indexOf('dash') !== -1) {
           }
         })));
     }).catch((err) => {
+      console.log(err)
       log(`:bangbang:  ${err}`);
       process.exit();
     });
