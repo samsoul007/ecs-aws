@@ -36,7 +36,7 @@
     "node-emoji": "^1.8.1",
     "node-time-ago": "^1.0.0",
     "util.promisify": "^1.0.0",
-    "yargs": "^10.1.2"
+    "yargs": "^16.2.0"
   },
   "devDependencies": {
     "eslint": "^5.14.0",
