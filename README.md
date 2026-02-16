@@ -65,13 +65,9 @@ Contact your AWS administrator if you need these permissions added to your IAM u
 
 ecs-aws allows you to deploy an ECS service without having to modify all the configuration and task definition over and over.
 
-**This script is not meant to be for creating services directly. Set that up in your ECR environment or the AWS Console first**
-
-**The task definition and container name have to be the same. This will be changed in later versions.**
-
 **A docker file needs to be in the directory. It will be requested during the init and you can have multiple ones in the same directory for different services (ex: scheduled services)**
 
-Initialise a directory where you have a Dockerfile and code using `ecs-aws init [--profile profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure [--profile profilename]`) in order to retrieve the different services and clusters. The script will create `ECSConfig[profilename].json` in the directory after setup.
+Initialise inside a directory where you have a Dockerfile and code using `ecs-aws init [--profile profilename]`. You will be requested an AWS cli profile (you can setup one by doing `aws configure [--profile profilename]`) in order to retrieve the different services and clusters. The script will create `ECSConfig[profilename].json` in the directory after setup.
 
 after initialisation you can:
 
