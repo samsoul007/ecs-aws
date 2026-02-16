@@ -57,3 +57,5 @@ typings/
 # dotenv environment variables file
 .env
 
+# ECS-AWS configuration files (may contain environment variables with secrets)
+ECSConfig*.json
