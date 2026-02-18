@@ -1,0 +1,3302 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECS-AWS Web Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#667eea',
+                        secondary: '#764ba2',
+                        accent: '#f093fb'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <style>
+        body.dark-mode {
+            background: linear-gradient(135deg, #0f172a 0%, #111827 100%) !important;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode header,
+        body.dark-mode .bg-white {
+            background-color: #111827 !important;
+        }
+
+        body.dark-mode .bg-gray-50 {
+            background-color: #1f2937 !important;
+        }
+
+        body.dark-mode .bg-gray-100 {
+            background-color: #374151 !important;
+        }
+
+        body.dark-mode .text-gray-900 {
+            color: #f3f4f6 !important;
+        }
+
+        body.dark-mode .text-gray-800,
+        body.dark-mode .text-gray-700,
+        body.dark-mode .text-gray-600 {
+            color: #d1d5db !important;
+        }
+
+        body.dark-mode .text-gray-500 {
+            color: #9ca3af !important;
+        }
+
+        body.dark-mode .border-gray-200,
+        body.dark-mode .border-gray-300,
+        body.dark-mode .divide-gray-100 {
+            border-color: #374151 !important;
+        }
+
+        body.dark-mode .hover\:bg-gray-50:hover {
+            background-color: #374151 !important;
+        }
+
+        body.dark-mode .hover\:bg-indigo-50:hover {
+            background-color: #1f2937 !important;
+        }
+
+        body.dark-mode input,
+        body.dark-mode select,
+        body.dark-mode textarea {
+            background-color: #1f2937 !important;
+            color: #f3f4f6 !important;
+            border-color: #4b5563 !important;
+        }
+
+        body.dark-mode pre {
+            background-color: #030712 !important;
+        }
+
+        body.dark-mode .shadow-lg,
+        body.dark-mode .shadow-xl {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
+        }
+    </style>
+</head>
+
+<body class="bg-gradient-to-br from-primary to-secondary min-h-screen">
+    <!-- Top Header -->
+    <header class="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16 gap-4">
+                <!-- Left side: Logo and App name -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-rocket text-xl text-indigo-600"></i>
+                        <h1 class="text-xl font-bold text-gray-900">ECS-AWS Manager</h1>
+                    </div>
+                </div>
+
+                <!-- Right side: Service actions and status -->
+                <div class="flex items-center space-x-4">
+                    <button id="darkModeBtn"
+                        class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                        <i id="darkModeIcon" class="fa-regular fa-moon"></i>
+                        <span id="darkModeLabel">Dark</span>
+                    </button>
+                    <div id="topActionButtons" class="hidden flex items-center gap-2">
+                        <button id="refreshBtn"
+                            class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                            <i id="refreshIcon" class="fa-solid fa-rotate"></i>
+                            <span>Refresh</span>
+                        </button>
+                        <button id="deployBtn"
+                            class="inline-flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
+                            <i class="fa-solid fa-rocket"></i>
+                            <span>Deploy</span>
+                        </button>
+                        <button id="forceDeployBtn"
+                            class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors">
+                            <i class="fa-solid fa-rotate-right"></i>
+                            <span>Force Deploy</span>
+                        </button>
+                        <button id="scaleBtn"
+                            class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                            <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+                            <span>Scale</span>
+                        </button>
+                    </div>
+                    <div id="profileInfo" class="flex items-center space-x-4 text-sm text-gray-600">
+                        <div id="serviceName" class="hidden">
+                            <span class="text-xs text-gray-500 uppercase tracking-wide">Service</span>
+                            <div class="font-medium text-gray-900"></div>
+                        </div>
+                    </div>
+                    <div id="serviceStatus" class="hidden">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"></span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="flex items-center justify-center min-h-screen">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+            <p class="text-white mt-4 text-lg">Loading service information...</p>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div id="actionResult" class="mb-6"></div>
+
+        <!-- Service Overview Card -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fa-solid fa-chart-line mr-2 text-indigo-600"></i>
+                    Service Overview
+                </h2>
+                <div class="flex items-center gap-2">
+                    <button id="editConfigBtn"
+                        class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        <span>Edit Configuration</span>
+                    </button>
+                    <button id="deleteBtn"
+                        class="inline-flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors hidden">
+                        <i class="fa-regular fa-trash-can"></i>
+                        <span>Delete Service</span>
+                    </button>
+                </div>
+            </div>
+            <div id="serviceInfo" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Service info will be populated here -->
+            </div>
+        </div>
+
+        <!-- Logs & Events Controls -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fa-solid fa-list-check mr-2 text-indigo-600"></i>
+                Logs & Events
+            </h2>
+            <div class="flex flex-wrap gap-3">
+                <button id="logsBtn"
+                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <i class="fa-regular fa-file-lines"></i>
+                    <span>Logs</span>
+                </button>
+                <button id="eventsBtn"
+                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>Events</span>
+                </button>
+                <button id="tailBtn"
+                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
+                    <i class="fa-solid fa-wave-square"></i>
+                    <span>Tail</span>
+                </button>
+                <button id="stopTailBtn"
+                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors hidden">
+                    <i class="fa-solid fa-stop"></i>
+                    <span>Stop Tail</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Areas -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fa-solid fa-cubes mr-2 text-indigo-600"></i>
+                    Resource Details
+                </h2>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-48">
+                                    Resource</th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Value</th>
+                                <th
+                                    class="px-4 py-2 text-right text-xs font-semibold text-gray-600 uppercase tracking-wide w-24">
+                                    Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resourceDetailsBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fa-solid fa-bolt mr-2 text-indigo-600"></i>
+                    Service Events
+                </h2>
+                <div class="border border-gray-200 rounded-lg overflow-y-auto h-72">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-40">
+                                    Time</th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-28">
+                                    Level</th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="serviceEventsBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fa-solid fa-chart-area mr-2 text-indigo-600"></i>
+                    Metrics
+                </h2>
+                <span id="serviceTypeLabel"
+                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Loading</span>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">CPU Utilization (%)</div>
+                    <div class="px-4 py-3 border-b border-gray-100 relative">
+                        <svg id="cpuMetricChart" class="w-full h-28" viewBox="0 0 100 28"
+                            preserveAspectRatio="none"></svg>
+                    </div>
+                    <div class="overflow-y-auto max-h-64">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-white sticky top-0 z-10">
+                                <tr>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Time</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Avg</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Min</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Max</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cpuMetricsBody" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">Memory Utilization (%)</div>
+                    <div class="px-4 py-3 border-b border-gray-100 relative">
+                        <svg id="memoryMetricChart" class="w-full h-28" viewBox="0 0 100 28"
+                            preserveAspectRatio="none"></svg>
+                    </div>
+                    <div class="overflow-y-auto max-h-64">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-white sticky top-0 z-10">
+                                <tr>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Time</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Avg</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Min</th>
+                                    <th
+                                        class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                        Max</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memoryMetricsBody" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fa-solid fa-gauge-high mr-2 text-indigo-600"></i>
+                Advanced Metrics
+            </h2>
+            <div id="advancedMetricsGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+        </div>
+    </div>
+
+    <div id="operationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-gray-900/60" id="operationBackdrop"></div>
+        <div class="relative w-full max-w-5xl bg-white rounded-lg shadow-xl border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 id="operationTitle" class="text-base font-semibold text-gray-900">Operation</h3>
+                <button id="operationCloseBtn" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="operationForm" class="hidden px-5 py-4 border-b border-gray-100 space-y-3"></div>
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-xs text-gray-500" id="outputCount">0 entries</div>
+                </div>
+                <div id="outputContainer" class="border border-gray-200 rounded-lg h-[26rem] overflow-y-auto bg-white">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-40">
+                                    Time</th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide w-28">
+                                    Type</th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                                    Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="outputTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dialogModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div id="dialogBackdrop" class="absolute inset-0 bg-gray-900/60"></div>
+        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl border border-gray-200">
+            <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 id="dialogTitle" class="text-base font-semibold text-gray-900">Confirm</h3>
+                <button id="dialogCloseBtn" class="text-gray-500 hover:text-gray-700" aria-label="Close dialog">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="px-5 py-4">
+                <p id="dialogMessage" class="text-sm text-gray-700 whitespace-pre-wrap"></p>
+                <div id="dialogFields" class="mt-4 space-y-3"></div>
+                <div id="dialogError" class="hidden mt-3 text-sm text-red-600"></div>
+            </div>
+            <div class="px-5 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
+                <button id="dialogCancelBtn"
+                    class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button id="dialogConfirmBtn"
+                    class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"
+        class="fixed bottom-4 right-4 z-[80] flex flex-col gap-2 w-[22rem] max-w-[calc(100vw-2rem)] pointer-events-none">
+    </div>
+
+    <!-- Error Screen -->
+    <div id="errorScreen" class="hidden flex items-center justify-center min-h-screen">
+        <div class="text-center max-w-md mx-auto">
+            <div class="text-6xl mb-4 text-red-300"><i class="fa-solid fa-circle-xmark"></i></div>
+            <h2 class="text-white text-2xl font-bold mb-4">Failed to Load Profile</h2>
+            <p id="errorMessage" class="text-white mb-6"></p>
+            <button onclick="location.reload()"
+                class="bg-white text-primary px-6 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors duration-200">
+                Reload Page
+            </button>
+        </div>
+    </div>
+
+    <div id="profileWizard"
+        class="hidden fixed inset-0 z-[70] bg-gradient-to-br from-primary to-secondary overflow-hidden">
+        <div class="w-full h-full">
+            <div class="bg-white h-full w-full flex flex-col overflow-hidden">
+                <div class="px-6 py-5 border-b border-gray-200">
+                    <h2 class="text-xl font-semibold text-gray-900">Profile Setup Wizard</h2>
+                    <p id="wizardSubtitle" class="text-sm text-gray-600 mt-1">Choose a Dockerfile path and verify its
+                        contents before continuing.</p>
+                    <div class="mt-4 grid grid-cols-5 gap-2 text-xs" id="wizardStepIndicators">
+                        <div id="wizardStepIndicator1"
+                            class="px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-medium text-center">1.
+                            Dockerfile</div>
+                        <div id="wizardStepIndicator2" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
+                            2. Profile</div>
+                        <div id="wizardStepIndicator3" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
+                            3. Region</div>
+                        <div id="wizardStepIndicator4" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
+                            4. Service Mode</div>
+                        <div id="wizardStepIndicator5" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
+                            5. Container + Env</div>
+                    </div>
+                </div>
+
+                <div class="px-6 py-6 flex-1 overflow-y-auto">
+                    <div id="wizardStep1" class="space-y-4">
+                        <h3 class="text-base font-semibold text-gray-900">Step 1 — Dockerfile</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Config Profile</label>
+                                <div class="relative">
+                                    <input id="wizardConfigProfile" type="text" readonly
+                                        class="w-full px-3 py-2 border border-green-300 rounded-md bg-green-50 text-sm text-gray-700" />
+                                    <i class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Dockerfile</label>
+                                <div class="relative">
+                                    <input id="wizardDockerfile" type="text" value="Dockerfile"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidDockerfile"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="wizardDockerfilePreviewWrap"
+                            class="hidden border border-gray-200 rounded-lg overflow-hidden">
+                            <div
+                                class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-700">
+                                Dockerfile Content
+                            </div>
+                            <pre
+                                class="w-full p-4 bg-gray-900 text-gray-100 text-xs overflow-x-auto"><code id="wizardDockerfilePreview" class="whitespace-pre"></code></pre>
+                        </div>
+                        <div id="wizardDockerfilePreviewError" class="hidden text-sm text-red-600"></div>
+                    </div>
+
+                    <div id="wizardStep2" class="hidden space-y-4">
+                        <h3 class="text-base font-semibold text-gray-900">Step 2 — AWS Profile</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">AWS Profile</label>
+                                <div class="relative">
+                                    <select id="wizardAwsProfile"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                    <i id="wizardValidAwsProfile"
+                                        class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="wizardStep3" class="hidden space-y-4">
+                        <h3 class="text-base font-semibold text-gray-900">Step 3 — Region</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Region</label>
+                                <div class="relative">
+                                    <select id="wizardRegion"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                    <i id="wizardValidRegion"
+                                        class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="wizardStep4" class="hidden space-y-4">
+                        <h3 class="text-base font-semibold text-gray-900">Step 4 — Service Mode</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                                <div class="relative">
+                                    <select id="wizardServiceMode"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900">
+                                        <option value="existing">Existing Service</option>
+                                        <option value="new">New Service</option>
+                                    </select>
+                                    <i id="wizardValidServiceMode"
+                                        class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="wizardStep5" class="hidden space-y-4">
+                        <h3 id="wizardStep5Title" class="text-base font-semibold text-gray-900">Step 5 — Existing
+                            Service Resources + Container</h3>
+
+                        <div id="wizardExistingServiceSection" class="space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">ECR Repository</label>
+                                    <div class="relative">
+                                        <select id="wizardRepo"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidRepo"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Cluster</label>
+                                    <div class="relative">
+                                        <select id="wizardCluster"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidCluster"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Task Definition</label>
+                                    <div class="relative">
+                                        <select id="wizardTask"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidTask"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Service</label>
+                                    <div class="relative">
+                                        <select id="wizardService"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidService"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="wizardNewServiceResourcesSection" class="hidden space-y-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Cluster</label>
+                                    <div class="relative">
+                                        <select id="wizardNewCluster"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidNewCluster"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Container Memory</label>
+                                <div class="relative">
+                                    <input id="wizardMemory" type="number" value="128"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidMemory"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">CPU Units</label>
+                                <div class="relative">
+                                    <input id="wizardCpu" type="number" value="0"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidCpu"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Host Port</label>
+                                <div class="relative">
+                                    <input id="wizardHostPort" type="number" value="0"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidHostPort"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">App Port</label>
+                                <div class="relative">
+                                    <input id="wizardAppPort" type="number" value="8080"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidAppPort"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Local Port</label>
+                                <div class="relative">
+                                    <input id="wizardLocalPort" type="number" value="8080"
+                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                    <i id="wizardValidLocalPort"
+                                        class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">ENV Variables</label>
+                                <button id="wizardAddEnvBtn"
+                                    class="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">
+                                    Add Variable
+                                </button>
+                            </div>
+                            <div id="wizardEnvRows" class="space-y-2"></div>
+                        </div>
+
+                        <div id="wizardNewServiceSection"
+                            class="hidden space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <h4 class="text-sm font-semibold text-gray-900">New Service Creation Flow</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Service Name</label>
+                                    <div class="relative">
+                                        <input id="wizardNewServiceName" type="text"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                        <i id="wizardValidNewServiceName"
+                                            class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Application Port</label>
+                                    <div class="relative">
+                                        <input id="wizardNewAppPort" type="number" value="8080"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                        <i id="wizardValidNewAppPort"
+                                            class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Load Balancer</label>
+                                    <div class="relative">
+                                        <select id="wizardNewLoadBalancer"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidNewLoadBalancer"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Listener</label>
+                                    <div class="relative">
+                                        <select id="wizardNewListener"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
+                                        <i id="wizardValidNewListener"
+                                            class="fa-solid fa-check text-green-600 absolute right-8 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Health Check
+                                        Path</label>
+                                    <div class="relative">
+                                        <input id="wizardNewHealthPath" type="text" value="/"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                        <i id="wizardValidNewHealthPath"
+                                            class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Desired Tasks</label>
+                                    <div class="relative">
+                                        <input id="wizardNewDesiredCount" type="number" value="1"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                        <i id="wizardValidNewDesiredCount"
+                                            class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                                <div class="md:col-span-2 flex items-center gap-3">
+                                    <input id="wizardNewUseHostname" type="checkbox"
+                                        class="h-4 w-4 text-indigo-600 border-gray-300 rounded" />
+                                    <label for="wizardNewUseHostname" class="text-sm text-gray-700">Configure hostname
+                                        routing</label>
+                                </div>
+                                <div id="wizardNewHostnameWrap" class="md:col-span-2 hidden">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Hostname</label>
+                                    <div class="relative">
+                                        <input id="wizardNewHostname" type="text" placeholder="api.example.com"
+                                            class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900" />
+                                        <i id="wizardValidNewHostname"
+                                            class="fa-solid fa-check text-green-600 absolute right-3 top-3 text-sm hidden"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="wizardError" class="hidden text-sm text-red-600"></div>
+                </div>
+
+                <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                    <div></div>
+                    <div class="flex items-center gap-2">
+                        <button id="wizardCancelBtn"
+                            class="hidden inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button id="wizardPrevBtn"
+                            class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 hidden">
+                            Back
+                        </button>
+                        <button id="wizardNextBtn"
+                            class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+                            Next
+                        </button>
+                        <button id="wizardCreateBtn"
+                            class="hidden inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+                            Create Profile
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentProfile = '';
+        let isLoading = false;
+
+        // DOM elements
+        const loadingScreen = document.getElementById('loadingScreen');
+        const mainContent = document.getElementById('mainContent');
+        const errorScreen = document.getElementById('errorScreen');
+        const errorMessage = document.getElementById('errorMessage');
+        const profileName = document.getElementById('profileName');
+        const serviceName = document.getElementById('serviceName');
+        const serviceStatus = document.getElementById('serviceStatus');
+        const serviceInfo = document.getElementById('serviceInfo');
+        const resourceDetailsBody = document.getElementById('resourceDetailsBody');
+        const serviceEventsBody = document.getElementById('serviceEventsBody');
+        const cpuMetricsBody = document.getElementById('cpuMetricsBody');
+        const memoryMetricsBody = document.getElementById('memoryMetricsBody');
+        const cpuMetricChart = document.getElementById('cpuMetricChart');
+        const memoryMetricChart = document.getElementById('memoryMetricChart');
+        const advancedMetricsGrid = document.getElementById('advancedMetricsGrid');
+        const serviceTypeLabel = document.getElementById('serviceTypeLabel');
+        const outputContainer = document.getElementById('outputContainer');
+        const outputTableBody = document.getElementById('outputTableBody');
+        const outputCount = document.getElementById('outputCount');
+        const operationModal = document.getElementById('operationModal');
+        const operationTitle = document.getElementById('operationTitle');
+        const operationForm = document.getElementById('operationForm');
+        const operationCloseBtn = document.getElementById('operationCloseBtn');
+        const operationBackdrop = document.getElementById('operationBackdrop');
+        const dialogModal = document.getElementById('dialogModal');
+        const dialogBackdrop = document.getElementById('dialogBackdrop');
+        const dialogTitle = document.getElementById('dialogTitle');
+        const dialogMessage = document.getElementById('dialogMessage');
+        const dialogFields = document.getElementById('dialogFields');
+        const dialogError = document.getElementById('dialogError');
+        const dialogCloseBtn = document.getElementById('dialogCloseBtn');
+        const dialogCancelBtn = document.getElementById('dialogCancelBtn');
+        const dialogConfirmBtn = document.getElementById('dialogConfirmBtn');
+        const actionResult = document.getElementById('actionResult');
+        const toastContainer = document.getElementById('toastContainer');
+        const darkModeBtn = document.getElementById('darkModeBtn');
+        const darkModeIcon = document.getElementById('darkModeIcon');
+        const darkModeLabel = document.getElementById('darkModeLabel');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const refreshIcon = document.getElementById('refreshIcon');
+        const topActionButtons = document.getElementById('topActionButtons');
+        const profileWizard = document.getElementById('profileWizard');
+        const wizardSubtitle = document.getElementById('wizardSubtitle');
+        const wizardConfigProfile = document.getElementById('wizardConfigProfile');
+        const wizardAwsProfile = document.getElementById('wizardAwsProfile');
+        const wizardRegion = document.getElementById('wizardRegion');
+        const wizardServiceMode = document.getElementById('wizardServiceMode');
+        const wizardStep5Title = document.getElementById('wizardStep5Title');
+        const wizardExistingServiceSection = document.getElementById('wizardExistingServiceSection');
+        const wizardNewServiceResourcesSection = document.getElementById('wizardNewServiceResourcesSection');
+        const wizardRepo = document.getElementById('wizardRepo');
+        const wizardCluster = document.getElementById('wizardCluster');
+        const wizardNewCluster = document.getElementById('wizardNewCluster');
+        const wizardTask = document.getElementById('wizardTask');
+        const wizardService = document.getElementById('wizardService');
+        const wizardDockerfile = document.getElementById('wizardDockerfile');
+        const wizardDockerfilePreviewWrap = document.getElementById('wizardDockerfilePreviewWrap');
+        const wizardDockerfilePreview = document.getElementById('wizardDockerfilePreview');
+        const wizardDockerfilePreviewError = document.getElementById('wizardDockerfilePreviewError');
+        const wizardMemory = document.getElementById('wizardMemory');
+        const wizardCpu = document.getElementById('wizardCpu');
+        const wizardHostPort = document.getElementById('wizardHostPort');
+        const wizardAppPort = document.getElementById('wizardAppPort');
+        const wizardLocalPort = document.getElementById('wizardLocalPort');
+        const wizardNewServiceSection = document.getElementById('wizardNewServiceSection');
+        const wizardNewServiceName = document.getElementById('wizardNewServiceName');
+        const wizardNewAppPort = document.getElementById('wizardNewAppPort');
+        const wizardNewLoadBalancer = document.getElementById('wizardNewLoadBalancer');
+        const wizardNewListener = document.getElementById('wizardNewListener');
+        const wizardNewHealthPath = document.getElementById('wizardNewHealthPath');
+        const wizardNewDesiredCount = document.getElementById('wizardNewDesiredCount');
+        const wizardNewUseHostname = document.getElementById('wizardNewUseHostname');
+        const wizardNewHostnameWrap = document.getElementById('wizardNewHostnameWrap');
+        const wizardNewHostname = document.getElementById('wizardNewHostname');
+        const wizardEnvRows = document.getElementById('wizardEnvRows');
+        const wizardAddEnvBtn = document.getElementById('wizardAddEnvBtn');
+        const wizardCancelBtn = document.getElementById('wizardCancelBtn');
+        const wizardPrevBtn = document.getElementById('wizardPrevBtn');
+        const wizardNextBtn = document.getElementById('wizardNextBtn');
+        const wizardCreateBtn = document.getElementById('wizardCreateBtn');
+        const wizardError = document.getElementById('wizardError');
+        const MAX_OUTPUT_ROWS = 500;
+        const OUTPUT_PAGE_SIZE = 100;
+        const AUTO_REFRESH_MS = 5000;
+        const metricChartData = new Map();
+        let metricTooltip = null;
+        let currentOperationPoller = null;
+        let currentOperationLastEvent = 0;
+        let deletePermissionInfo = null;
+        let dashboardRefreshTimer = null;
+        let isDashboardRefreshing = false;
+        let profileHoverText = '';
+        let wizardProfileName = 'default';
+        let wizardStep = 1;
+        let serverStopCloseTimer = null;
+        let wizardDockerfileExists = false;
+        let wizardDockerfileCheckTimer = null;
+        let operationListMode = null;
+        let operationListOffset = 0;
+        let operationListHasMore = false;
+        let operationListLoading = false;
+        let isTailStreaming = false;
+        let currentServiceInfo = null;
+        let wizardEditMode = false;
+        let darkModeEnabled = false;
+
+        function getStoredThemePreference() {
+            try {
+                const value = localStorage.getItem('ecsAwsTheme');
+                if (value === 'dark') return true;
+                if (value === 'light') return false;
+            } catch (error) {
+                // Ignore storage issues
+            }
+
+            return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+
+        function updateDarkModeButton() {
+            if (!darkModeBtn || !darkModeIcon || !darkModeLabel) return;
+            darkModeIcon.className = darkModeEnabled ? 'fa-regular fa-sun' : 'fa-regular fa-moon';
+            darkModeLabel.textContent = darkModeEnabled ? 'Light' : 'Dark';
+        }
+
+        function applyTheme(enabled, persist = false) {
+            darkModeEnabled = !!enabled;
+            document.body.classList.toggle('dark-mode', darkModeEnabled);
+            updateDarkModeButton();
+
+            if (persist) {
+                try {
+                    localStorage.setItem('ecsAwsTheme', darkModeEnabled ? 'dark' : 'light');
+                } catch (error) {
+                    // Ignore storage issues
+                }
+            }
+        }
+
+        function updateBodyScrollLock() {
+            const operationOpen = operationModal && !operationModal.classList.contains('hidden');
+            const dialogOpen = dialogModal && !dialogModal.classList.contains('hidden');
+            const wizardOpen = profileWizard && !profileWizard.classList.contains('hidden');
+            const shouldLock = operationOpen || dialogOpen || wizardOpen;
+
+            if (shouldLock) {
+                document.body.classList.add('overflow-hidden');
+            } else {
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
+        // Control buttons
+        const deployBtn = document.getElementById('deployBtn');
+        const forceDeployBtn = document.getElementById('forceDeployBtn');
+        const scaleBtn = document.getElementById('scaleBtn');
+        const logsBtn = document.getElementById('logsBtn');
+        const eventsBtn = document.getElementById('eventsBtn');
+        const tailBtn = document.getElementById('tailBtn');
+        const stopTailBtn = document.getElementById('stopTailBtn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const editConfigBtn = document.getElementById('editConfigBtn');
+
+        // Initialize
+        applyTheme(getStoredThemePreference());
+        checkDefaultProfile();
+        addPlaceholderRow('Select an action to view output here...');
+        setEmptyTableState(resourceDetailsBody, 3, 'Loading resource details...');
+        setEmptyTableState(serviceEventsBody, 3, 'Loading service events...');
+        setEmptyTableState(cpuMetricsBody, 4, 'Loading CPU metrics...');
+        setEmptyTableState(memoryMetricsBody, 4, 'Loading memory metrics...');
+        setEmptyChartState(cpuMetricChart, 'No CPU data');
+        setEmptyChartState(memoryMetricChart, 'No memory data');
+        setEmptyAdvancedMetricsState();
+        initMetricTooltip();
+        bindProfileTooltip();
+        operationCloseBtn.addEventListener('click', closeOperationModal);
+        operationBackdrop.addEventListener('click', closeOperationModal);
+        dialogCloseBtn.addEventListener('click', () => closeDialog(false));
+        dialogCancelBtn.addEventListener('click', () => closeDialog(false));
+        dialogBackdrop.addEventListener('click', () => closeDialog(false));
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => refreshDashboardSections(true));
+        }
+        if (darkModeBtn) {
+            darkModeBtn.addEventListener('click', () => applyTheme(!darkModeEnabled, true));
+        }
+        resourceDetailsBody.addEventListener('click', async (event) => {
+            const trigger = event.target.closest('[data-copy-resource]');
+            if (!trigger) {
+                return;
+            }
+
+            const text = trigger.dataset.copyResource || '';
+            try {
+                await copyToClipboard(text);
+                showSuccess('Copied to clipboard.');
+            } catch (error) {
+                showActionError('Failed to copy value to clipboard.');
+            }
+        });
+        outputContainer.addEventListener('scroll', () => {
+            if (!operationListMode || operationListLoading || !operationListHasMore) {
+                return;
+            }
+
+            if (operationModal.classList.contains('hidden')) {
+                return;
+            }
+
+            const distanceToBottom = outputContainer.scrollHeight - outputContainer.scrollTop - outputContainer.clientHeight;
+            if (distanceToBottom <= 80) {
+                loadMoreOperationList();
+            }
+        });
+        wizardPrevBtn.addEventListener('click', () => goToWizardStep(wizardStep - 1));
+        wizardNextBtn.addEventListener('click', () => goToWizardStep(wizardStep + 1));
+        wizardCreateBtn.addEventListener('click', createProfileFromWizard);
+        wizardCancelBtn.addEventListener('click', closeWizardWithoutSaving);
+        wizardAddEnvBtn.addEventListener('click', () => addEnvRow('', ''));
+        wizardCluster.addEventListener('change', () => loadWizardOptions(true));
+        wizardNewCluster.addEventListener('change', () => loadWizardOptions(true));
+        wizardServiceMode.addEventListener('change', onWizardServiceModeChanged);
+        wizardAwsProfile.addEventListener('change', () => loadWizardOptions());
+        wizardRegion.addEventListener('change', () => loadWizardOptions());
+        wizardNewLoadBalancer.addEventListener('change', () => loadWizardNewServiceOptions(true));
+        wizardNewUseHostname.addEventListener('change', () => {
+            wizardNewHostnameWrap.classList.toggle('hidden', !wizardNewUseHostname.checked);
+            updateWizardValidationUI();
+        });
+        wizardDockerfile.addEventListener('input', () => {
+            wizardDockerfileExists = false;
+            wizardDockerfilePreviewWrap.classList.add('hidden');
+            wizardDockerfilePreviewError.classList.add('hidden');
+
+            if (wizardDockerfileCheckTimer) {
+                clearTimeout(wizardDockerfileCheckTimer);
+            }
+
+            wizardDockerfileCheckTimer = setTimeout(() => {
+                checkDockerfilePreview();
+            }, 350);
+        });
+        wizardDockerfile.addEventListener('blur', () => checkDockerfilePreview());
+
+        [wizardDockerfile, wizardAwsProfile, wizardRegion, wizardServiceMode, wizardRepo, wizardCluster, wizardNewCluster, wizardTask, wizardService,
+            wizardMemory, wizardCpu, wizardHostPort, wizardAppPort, wizardLocalPort,
+            wizardNewServiceName, wizardNewAppPort, wizardNewLoadBalancer, wizardNewListener,
+            wizardNewHealthPath, wizardNewDesiredCount, wizardNewHostname]
+            .forEach((input) => {
+                if (!input) return;
+                input.addEventListener('change', updateWizardValidationUI);
+                input.addEventListener('input', updateWizardValidationUI);
+            });
+
+        // Auto-load profile function
+        async function checkDefaultProfile() {
+            try {
+                const response = await fetch('/api/default-profile');
+                const data = await response.json();
+
+                if (data.defaultProfile) {
+                    currentProfile = data.defaultProfile;
+
+                    // Update header with profile name, and show working directory as mouseover tooltip
+                    profileHoverText = data.workingDirectory || '';
+
+                    // Show available profiles in console for debugging
+                    console.log('Available profiles:', data.availableProfiles);
+                    console.log('Working directory:', data.workingDirectory);
+
+                    if (!data.profileExists) {
+                        loadingScreen.classList.add('hidden');
+                        mainContent.classList.add('hidden');
+                        await showProfileCreationWizard(data.defaultProfile);
+                        return;
+                    }
+
+                    try {
+                        await loadServiceInfo();
+                        startDashboardAutoRefresh();
+                        loadingScreen.classList.add('hidden');
+                        mainContent.classList.remove('hidden');
+                    } catch (error) {
+                        showError(`Failed to load profile "${data.defaultProfile}": ${error.message}`);
+                    }
+                } else {
+                    showError('No profile specified. Please run: ecs-aws web -p [profile]');
+                }
+            } catch (error) {
+                showError('Error loading profile: ' + error.message);
+            }
+        }
+
+        async function showProfileCreationWizard(profile, options = {}) {
+            const { prefillConfig = null, editMode = false } = options;
+
+            wizardEditMode = !!editMode;
+            wizardProfileName = profile || 'default';
+            wizardConfigProfile.value = wizardProfileName;
+            wizardCreateBtn.textContent = wizardEditMode ? 'Save Configuration' : 'Create Profile';
+            profileWizard.classList.remove('hidden');
+            updateBodyScrollLock();
+            wizardError.classList.add('hidden');
+            wizardError.textContent = '';
+            wizardStep = 1;
+            renderWizardStep();
+            wizardEnvRows.innerHTML = '';
+            wizardNewServiceName.value = '';
+            wizardNewAppPort.value = 8080;
+            wizardNewHealthPath.value = '/';
+            wizardNewDesiredCount.value = 1;
+            wizardNewUseHostname.checked = false;
+            wizardNewHostname.value = '';
+            wizardNewHostnameWrap.classList.add('hidden');
+            wizardDockerfile.value = 'Dockerfile';
+            wizardMemory.value = 128;
+            wizardCpu.value = 0;
+            wizardHostPort.value = 0;
+            wizardAppPort.value = 8080;
+            wizardLocalPort.value = 8080;
+            wizardServiceMode.value = 'existing';
+
+            try {
+                const response = await fetch(`/api/wizard/bootstrap/${encodeURIComponent(wizardProfileName)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Unable to load wizard bootstrap data');
+                }
+
+                populateSelect(wizardAwsProfile, (data.awsProfiles || []).map(profileName => ({
+                    label: profileName,
+                    value: profileName,
+                })), 'default');
+
+                if (!wizardAwsProfile.value) {
+                    populateSelect(wizardAwsProfile, [{ label: 'default', value: 'default' }], 'default');
+                }
+
+                addEnvRow('', '');
+
+                await loadWizardOptions();
+
+                if (prefillConfig) {
+                    await applyWizardPrefill(prefillConfig);
+                }
+
+                await checkDockerfilePreview();
+                updateWizardValidationUI();
+            } catch (error) {
+                wizardError.textContent = error.message;
+                wizardError.classList.remove('hidden');
+            }
+        }
+
+        async function applyWizardPrefill(config) {
+            const safeConfig = config || {};
+            const newServiceConfig = safeConfig.new_service || safeConfig.newService || null;
+            const isNewServiceMode = !!newServiceConfig;
+
+            wizardDockerfile.value = safeConfig.dockerfile || wizardDockerfile.value || 'Dockerfile';
+            wizardAwsProfile.value = safeConfig.profile || wizardAwsProfile.value || 'default';
+            wizardRegion.value = safeConfig.region || wizardRegion.value || 'eu-west-1';
+
+            wizardRepo.value = safeConfig.repo || wizardRepo.value || '';
+            wizardCluster.value = safeConfig.cluster || wizardCluster.value || '';
+            wizardNewCluster.value = safeConfig.cluster || wizardNewCluster.value || '';
+            wizardTask.value = safeConfig.task || wizardTask.value || '';
+
+            wizardServiceMode.value = isNewServiceMode ? 'new' : 'existing';
+            onWizardServiceModeChanged();
+
+            await loadWizardOptions();
+            if (!isNewServiceMode && wizardCluster.value) {
+                await loadWizardOptions(true);
+            }
+
+            wizardMemory.value = safeConfig.container_memory ?? wizardMemory.value;
+            wizardCpu.value = safeConfig.cpu_units ?? wizardCpu.value;
+            wizardHostPort.value = safeConfig.host_port ?? wizardHostPort.value;
+            wizardAppPort.value = safeConfig.app_port ?? wizardAppPort.value;
+            wizardLocalPort.value = safeConfig.local_port ?? wizardLocalPort.value;
+
+            if (!isNewServiceMode) {
+                wizardService.value = safeConfig.service || '__cronjob__';
+            }
+
+            if (isNewServiceMode) {
+                wizardNewServiceName.value = newServiceConfig.serviceName || safeConfig.task || '';
+                wizardNewAppPort.value = newServiceConfig.app_port ?? safeConfig.app_port ?? wizardNewAppPort.value;
+                wizardNewLoadBalancer.value = newServiceConfig.loadBalancerArn || '';
+                await loadWizardNewServiceOptions();
+                wizardNewListener.value = newServiceConfig.listenerArn || wizardNewListener.value || '';
+                wizardNewHealthPath.value = newServiceConfig.healthCheckPath || '/';
+                wizardNewDesiredCount.value = newServiceConfig.desiredCount ?? wizardNewDesiredCount.value;
+                wizardNewUseHostname.checked = !!newServiceConfig.useHostname;
+                wizardNewHostname.value = newServiceConfig.hostname || '';
+                wizardNewHostnameWrap.classList.toggle('hidden', !wizardNewUseHostname.checked);
+            }
+
+            wizardEnvRows.innerHTML = '';
+            const envValues = Array.isArray(safeConfig.env) ? safeConfig.env : [];
+            if (envValues.length) {
+                envValues.forEach((item) => addEnvRow(item.name || '', item.value || ''));
+            } else {
+                addEnvRow('', '');
+            }
+
+            updateWizardValidationUI();
+        }
+
+        async function openEditConfigurationWizard() {
+            if (!currentProfile) {
+                return;
+            }
+
+            const config = currentServiceInfo?.config;
+            if (!config) {
+                showActionError('Current configuration is unavailable. Reload and try again.');
+                return;
+            }
+
+            await showProfileCreationWizard(currentProfile, {
+                prefillConfig: config,
+                editMode: true,
+            });
+        }
+
+        function closeWizardWithoutSaving() {
+            profileWizard.classList.add('hidden');
+            wizardEditMode = false;
+            wizardCreateBtn.textContent = 'Create Profile';
+            updateBodyScrollLock();
+        }
+
+        async function checkDockerfilePreview() {
+            const dockerfilePath = (wizardDockerfile.value || '').trim();
+            wizardDockerfileExists = false;
+            wizardDockerfilePreviewWrap.classList.add('hidden');
+            wizardDockerfilePreviewError.classList.add('hidden');
+            wizardDockerfilePreviewError.textContent = '';
+            wizardDockerfilePreview.textContent = '';
+
+            if (!dockerfilePath) {
+                updateWizardValidationUI();
+                return;
+            }
+
+            try {
+                const query = new URLSearchParams({ path: dockerfilePath }).toString();
+                const response = await fetch(`/api/wizard/dockerfile?${query}`);
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to check Dockerfile');
+                }
+
+                if (result.exists) {
+                    wizardDockerfileExists = true;
+                    wizardDockerfilePreview.textContent = result.content || '';
+                    wizardDockerfilePreviewWrap.classList.remove('hidden');
+                } else {
+                    wizardDockerfileExists = false;
+                    wizardDockerfilePreviewError.textContent = `Dockerfile not found: ${dockerfilePath}`;
+                    wizardDockerfilePreviewError.classList.remove('hidden');
+                }
+            } catch (error) {
+                wizardDockerfileExists = false;
+                wizardDockerfilePreviewError.textContent = error.message;
+                wizardDockerfilePreviewError.classList.remove('hidden');
+            }
+
+            updateWizardValidationUI();
+        }
+
+        function renderWizardStep() {
+            const stepSubtitles = {
+                1: 'Choose a Dockerfile path and verify its contents before continuing.',
+                2: 'Select the AWS credentials profile used for all resource operations.',
+                3: 'Pick the AWS region where service resources are discovered or created.',
+                4: 'Choose whether this profile targets an existing service or creates a new service flow.',
+                5: wizardServiceMode.value === 'new'
+                    ? 'Provide new service resource details and container settings to match the new-service flow.'
+                    : 'Select existing resources and configure container settings before creating the profile.',
+            };
+
+            if (wizardSubtitle) {
+                wizardSubtitle.textContent = stepSubtitles[wizardStep] || stepSubtitles[1];
+            }
+
+            for (let step = 1; step <= 5; step += 1) {
+                const panel = document.getElementById(`wizardStep${step}`);
+                const indicator = document.getElementById(`wizardStepIndicator${step}`);
+                if (!panel || !indicator) continue;
+
+                if (step === wizardStep) {
+                    panel.classList.remove('hidden');
+                    indicator.className = 'px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-medium text-center';
+                } else {
+                    panel.classList.add('hidden');
+                    indicator.className = 'px-2 py-1 rounded bg-gray-100 text-gray-600 text-center';
+                }
+            }
+
+            const modeIsNew = wizardServiceMode.value === 'new';
+            const step5Label = modeIsNew ? '5. New Service Flow + Container' : '5. Existing Resources + Container';
+            const step5Indicator = document.getElementById('wizardStepIndicator5');
+            if (step5Indicator) {
+                step5Indicator.textContent = step5Label;
+            }
+            if (wizardStep5Title) {
+                wizardStep5Title.textContent = modeIsNew
+                    ? 'Step 5 — New Service Flow + Container + Env'
+                    : 'Step 5 — Existing Service Resources + Container + Env';
+            }
+            if (wizardExistingServiceSection) {
+                wizardExistingServiceSection.classList.toggle('hidden', modeIsNew);
+            }
+            if (wizardNewServiceResourcesSection) {
+                wizardNewServiceResourcesSection.classList.toggle('hidden', !modeIsNew);
+            }
+
+            if (wizardStep <= 1) {
+                wizardPrevBtn.classList.add('hidden');
+            } else {
+                wizardPrevBtn.classList.remove('hidden');
+            }
+
+            if (wizardCancelBtn) {
+                wizardCancelBtn.classList.toggle('hidden', !wizardEditMode);
+            }
+
+            if (wizardStep >= 5) {
+                wizardNextBtn.classList.add('hidden');
+                wizardCreateBtn.classList.remove('hidden');
+            } else {
+                wizardNextBtn.classList.remove('hidden');
+                wizardCreateBtn.classList.add('hidden');
+            }
+        }
+
+        function isNonNegativeInteger(value) {
+            const parsed = Number(value);
+            return Number.isInteger(parsed) && parsed >= 0;
+        }
+
+        function setValidState(input, iconId, isValid) {
+            const icon = document.getElementById(iconId);
+            if (!input) return;
+
+            if (isValid) {
+                input.classList.remove('border-gray-300');
+                input.classList.add('border-green-300', 'bg-green-50');
+                if (icon) icon.classList.remove('hidden');
+            } else {
+                input.classList.remove('border-green-300', 'bg-green-50');
+                input.classList.add('border-gray-300');
+                if (icon) icon.classList.add('hidden');
+            }
+        }
+
+        function updateWizardValidationUI() {
+            const isNewServiceMode = wizardServiceMode.value === 'new';
+            setValidState(wizardDockerfile, 'wizardValidDockerfile', !!wizardDockerfile.value.trim() && wizardDockerfileExists);
+            setValidState(wizardAwsProfile, 'wizardValidAwsProfile', !!wizardAwsProfile.value);
+            setValidState(wizardRegion, 'wizardValidRegion', !!wizardRegion.value);
+            setValidState(wizardServiceMode, 'wizardValidServiceMode', !!wizardServiceMode.value);
+            setValidState(wizardRepo, 'wizardValidRepo', isNewServiceMode ? true : !!wizardRepo.value);
+            setValidState(wizardCluster, 'wizardValidCluster', isNewServiceMode ? true : !!wizardCluster.value);
+            setValidState(wizardNewCluster, 'wizardValidNewCluster', isNewServiceMode ? !!wizardNewCluster.value : true);
+            setValidState(wizardTask, 'wizardValidTask', isNewServiceMode ? true : !!wizardTask.value);
+            setValidState(wizardService, 'wizardValidService', isNewServiceMode ? true : wizardService.value !== '');
+            setValidState(wizardMemory, 'wizardValidMemory', isNonNegativeInteger(wizardMemory.value));
+            setValidState(wizardCpu, 'wizardValidCpu', isNonNegativeInteger(wizardCpu.value));
+            setValidState(wizardHostPort, 'wizardValidHostPort', isNonNegativeInteger(wizardHostPort.value));
+            setValidState(wizardAppPort, 'wizardValidAppPort', isNonNegativeInteger(wizardAppPort.value));
+            setValidState(wizardLocalPort, 'wizardValidLocalPort', isNonNegativeInteger(wizardLocalPort.value));
+            setValidState(wizardNewServiceName, 'wizardValidNewServiceName', !!(wizardNewServiceName.value || '').trim());
+            setValidState(wizardNewAppPort, 'wizardValidNewAppPort', Number(wizardNewAppPort.value) > 0 && isNonNegativeInteger(wizardNewAppPort.value));
+            setValidState(wizardNewLoadBalancer, 'wizardValidNewLoadBalancer', !!wizardNewLoadBalancer.value);
+            setValidState(wizardNewListener, 'wizardValidNewListener', !!wizardNewListener.value);
+            setValidState(wizardNewHealthPath, 'wizardValidNewHealthPath', !!(wizardNewHealthPath.value || '').trim() && wizardNewHealthPath.value.startsWith('/'));
+            setValidState(wizardNewDesiredCount, 'wizardValidNewDesiredCount', isNonNegativeInteger(wizardNewDesiredCount.value));
+            setValidState(wizardNewHostname, 'wizardValidNewHostname', !wizardNewUseHostname.checked || !!(wizardNewHostname.value || '').trim());
+
+            const envRows = wizardEnvRows.querySelectorAll('[data-env-row]');
+            envRows.forEach((row) => {
+                const keyInput = row.querySelector('[data-env-key]');
+                const valueInput = row.querySelector('[data-env-value]');
+                const check = row.querySelector('[data-env-check]');
+                const valid = !!keyInput.value.trim() && !!valueInput.value.trim();
+
+                if (valid) {
+                    row.classList.add('border-green-300', 'bg-green-50');
+                    row.classList.remove('border-gray-200');
+                    check.classList.remove('hidden');
+                } else {
+                    row.classList.remove('border-green-300', 'bg-green-50');
+                    row.classList.add('border-gray-200');
+                    check.classList.add('hidden');
+                }
+            });
+        }
+
+        function validateWizardStep(step) {
+            const isNewServiceMode = wizardServiceMode.value === 'new';
+            if (step === 1) {
+                if (!wizardDockerfile.value.trim()) {
+                    return 'Dockerfile is required.';
+                }
+                if (!wizardDockerfileExists) {
+                    return 'Dockerfile must exist before continuing.';
+                }
+            }
+            if (step === 2 && !wizardAwsProfile.value) {
+                return 'AWS profile is required.';
+            }
+            if (step === 3 && !wizardRegion.value) {
+                return 'Region is required.';
+            }
+            if (step === 4) {
+                if (!wizardServiceMode.value) return 'Service mode is required.';
+            }
+            if (step === 5) {
+                if (!isNewServiceMode && !wizardRepo.value) return 'Repository is required.';
+                if (!isNewServiceMode && !wizardCluster.value) return 'Cluster is required.';
+                if (!isNewServiceMode && !wizardTask.value) return 'Task definition is required.';
+                if (isNewServiceMode && !wizardNewCluster.value) return 'Cluster is required for new service flow.';
+                if (!isNonNegativeInteger(wizardMemory.value)) return 'Container memory must be a non-negative integer.';
+                if (!isNonNegativeInteger(wizardCpu.value)) return 'CPU units must be a non-negative integer.';
+                if (!isNonNegativeInteger(wizardHostPort.value)) return 'Host port must be a non-negative integer.';
+                if (!isNonNegativeInteger(wizardAppPort.value)) return 'App port must be a non-negative integer.';
+                if (!isNonNegativeInteger(wizardLocalPort.value)) return 'Local port must be a non-negative integer.';
+
+                if (isNewServiceMode) {
+                    if (!(wizardNewServiceName.value || '').trim()) return 'Service name is required for new service flow.';
+                    if (!isNonNegativeInteger(wizardNewAppPort.value) || Number(wizardNewAppPort.value) <= 0) return 'Application port must be greater than 0.';
+                    if (!wizardNewLoadBalancer.value) return 'Load balancer is required for new service flow.';
+                    if (!wizardNewListener.value) return 'Listener is required for new service flow.';
+                    if (!(wizardNewHealthPath.value || '').trim().startsWith('/')) return 'Health check path must start with /.';
+                    if (!isNonNegativeInteger(wizardNewDesiredCount.value)) return 'Desired tasks must be a non-negative integer.';
+                    if (wizardNewUseHostname.checked && !(wizardNewHostname.value || '').trim()) return 'Hostname is required when hostname routing is enabled.';
+                }
+            }
+            return null;
+        }
+
+        function onWizardServiceModeChanged() {
+            const isNewServiceMode = wizardServiceMode.value === 'new';
+            wizardNewServiceSection.classList.toggle('hidden', !isNewServiceMode);
+            if (wizardStep >= 4) {
+                renderWizardStep();
+            }
+            if (isNewServiceMode) {
+                loadWizardNewServiceOptions();
+            }
+            updateWizardValidationUI();
+        }
+
+        async function loadWizardNewServiceOptions(listenersOnly = false) {
+            try {
+                const awsProfile = wizardAwsProfile.value || 'default';
+                const region = wizardRegion.value || 'eu-west-1';
+                const loadBalancerArn = wizardNewLoadBalancer.value || '';
+                const query = new URLSearchParams({ awsProfile, region, loadBalancerArn }).toString();
+                const response = await fetch(`/api/wizard/new-service/options?${query}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load new service options');
+                }
+
+                if (!listenersOnly) {
+                    populateSelect(wizardNewLoadBalancer, (data.loadBalancers || []).map(lb => ({
+                        label: `${lb.name} (${lb.dnsName})`,
+                        value: lb.arn,
+                    })), wizardNewLoadBalancer.value || null);
+
+                    const selectedLoadBalancerArn = wizardNewLoadBalancer.value || '';
+                    if (selectedLoadBalancerArn && selectedLoadBalancerArn !== loadBalancerArn) {
+                        await loadWizardNewServiceOptions(true);
+                        return;
+                    }
+                }
+
+                populateSelect(wizardNewListener, (data.listeners || []).map(listener => ({
+                    label: `Port ${listener.port} (${listener.protocol})`,
+                    value: listener.arn,
+                })), wizardNewListener.value || null);
+
+                updateWizardValidationUI();
+            } catch (error) {
+                wizardError.textContent = error.message;
+                wizardError.classList.remove('hidden');
+            }
+        }
+
+        function goToWizardStep(nextStep) {
+            const validationError = validateWizardStep(wizardStep);
+            if (nextStep > wizardStep && validationError) {
+                wizardError.textContent = validationError;
+                wizardError.classList.remove('hidden');
+                return;
+            }
+
+            wizardError.classList.add('hidden');
+            wizardError.textContent = '';
+            wizardStep = Math.max(1, Math.min(5, nextStep));
+            renderWizardStep();
+        }
+
+        function addEnvRow(key = '', value = '') {
+            const row = document.createElement('div');
+            row.setAttribute('data-env-row', 'true');
+            row.className = 'border border-gray-200 rounded-md p-3';
+            row.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+                    <input data-env-key type="text" placeholder="Key"
+                        class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(key)}" />
+                    <input data-env-value type="text" placeholder="Value"
+                        class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(value)}" />
+                    <div class="md:col-span-2 flex items-center justify-end gap-2">
+                        <i data-env-check class="fa-solid fa-check text-green-600 hidden"></i>
+                        <button data-env-remove class="inline-flex items-center px-2 py-1 rounded text-xs border border-gray-300 text-gray-700 hover:bg-gray-50">Remove</button>
+                    </div>
+                </div>
+            `;
+
+            const keyInput = row.querySelector('[data-env-key]');
+            const valueInput = row.querySelector('[data-env-value]');
+            const removeButton = row.querySelector('[data-env-remove]');
+
+            keyInput.addEventListener('input', updateWizardValidationUI);
+            valueInput.addEventListener('input', updateWizardValidationUI);
+            removeButton.addEventListener('click', () => {
+                row.remove();
+                if (!wizardEnvRows.querySelector('[data-env-row]')) {
+                    addEnvRow('', '');
+                }
+                updateWizardValidationUI();
+            });
+
+            wizardEnvRows.appendChild(row);
+            updateWizardValidationUI();
+        }
+
+        function populateSelect(selectElement, options, preferredValue = null) {
+            selectElement.innerHTML = '';
+
+            options.forEach((option) => {
+                const item = document.createElement('option');
+                item.value = option.value;
+                item.textContent = option.label;
+                selectElement.appendChild(item);
+            });
+
+            if (preferredValue !== null) {
+                const hasPreferred = options.some(option => option.value === preferredValue);
+                if (hasPreferred) {
+                    selectElement.value = preferredValue;
+                }
+            }
+        }
+
+        async function loadWizardOptions(servicesOnly = false) {
+            wizardError.classList.add('hidden');
+            wizardError.textContent = '';
+
+            try {
+                const awsProfile = wizardAwsProfile.value || 'default';
+                const region = wizardRegion.value || 'eu-west-1';
+                const cluster = wizardCluster.value || '';
+
+                const query = new URLSearchParams({ awsProfile, region, cluster }).toString();
+                const response = await fetch(`/api/wizard/options?${query}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to load wizard options');
+                }
+
+                const regions = (data.regions || []).map(value => ({ label: value, value }));
+                if (!servicesOnly && regions.length) {
+                    populateSelect(wizardRegion, regions, wizardRegion.value || 'eu-west-1');
+                }
+
+                if (!servicesOnly) {
+                    populateSelect(wizardRepo, (data.repositories || []).map(value => ({ label: value, value })), wizardRepo.value || null);
+                    populateSelect(wizardCluster, (data.clusters || []).map(value => ({ label: value, value })), wizardCluster.value || null);
+                    populateSelect(wizardNewCluster, (data.clusters || []).map(value => ({ label: value, value })), wizardNewCluster.value || null);
+                    populateSelect(wizardTask, (data.taskDefinitions || []).map(value => ({ label: value, value })), wizardTask.value || null);
+                }
+
+                const serviceOptions = [{ label: 'cronjob', value: '__cronjob__' }].concat(
+                    (data.services || []).map(value => ({
+                        label: value.includes('service/') ? value.split('service/')[1] : value,
+                        value,
+                    }))
+                );
+                populateSelect(wizardService, serviceOptions, wizardService.value || '__cronjob__');
+                onWizardServiceModeChanged();
+
+                updateWizardValidationUI();
+            } catch (error) {
+                wizardError.textContent = error.message;
+                wizardError.classList.remove('hidden');
+            }
+        }
+
+        function parseWizardEnv() {
+            const rows = wizardEnvRows.querySelectorAll('[data-env-row]');
+            const env = [];
+
+            rows.forEach((row) => {
+                const keyInput = row.querySelector('[data-env-key]');
+                const valueInput = row.querySelector('[data-env-value]');
+                const key = (keyInput.value || '').trim();
+                const value = (valueInput.value || '').trim();
+                if (key && value) {
+                    env.push({ name: key, value });
+                }
+            });
+
+            return env;
+        }
+
+        async function createProfileFromWizard() {
+            wizardError.classList.add('hidden');
+            wizardError.textContent = '';
+
+            const stepError = validateWizardStep(5);
+            if (stepError) {
+                wizardError.textContent = stepError;
+                wizardError.classList.remove('hidden');
+                return;
+            }
+
+            const isNewServiceMode = wizardServiceMode.value === 'new';
+
+            const requiredValues = [
+                { key: 'AWS Profile', value: wizardAwsProfile.value },
+                { key: 'Region', value: wizardRegion.value },
+                { key: 'Dockerfile', value: wizardDockerfile.value.trim() },
+            ];
+
+            if (!isNewServiceMode) {
+                requiredValues.push({ key: 'Cluster', value: wizardCluster.value });
+                requiredValues.push({ key: 'Repository', value: wizardRepo.value });
+                requiredValues.push({ key: 'Task Definition', value: wizardTask.value });
+            } else {
+                requiredValues.push({ key: 'Cluster', value: wizardNewCluster.value });
+            }
+
+            const missing = requiredValues.find(item => !item.value);
+            if (missing) {
+                wizardError.textContent = `${missing.key} is required.`;
+                wizardError.classList.remove('hidden');
+                return;
+            }
+
+            const payload = {
+                profile: wizardAwsProfile.value,
+                region: wizardRegion.value,
+                serviceMode: isNewServiceMode ? 'new' : 'existing',
+                repo: isNewServiceMode ? '' : wizardRepo.value,
+                cluster: isNewServiceMode ? wizardNewCluster.value : wizardCluster.value,
+                task: isNewServiceMode ? (wizardNewServiceName.value || '').trim() : wizardTask.value,
+                service: wizardService.value === '__cronjob__' ? false : wizardService.value,
+                dockerfile: wizardDockerfile.value.trim(),
+                container_memory: wizardMemory.value,
+                cpu_units: wizardCpu.value,
+                host_port: wizardHostPort.value,
+                app_port: wizardAppPort.value,
+                local_port: wizardLocalPort.value,
+                env: parseWizardEnv(),
+                newService: isNewServiceMode ? {
+                    serviceName: (wizardNewServiceName.value || '').trim(),
+                    app_port: Number(wizardNewAppPort.value),
+                    loadBalancerArn: wizardNewLoadBalancer.value,
+                    listenerArn: wizardNewListener.value,
+                    healthCheckPath: wizardNewHealthPath.value,
+                    desiredCount: Number(wizardNewDesiredCount.value),
+                    useHostname: !!wizardNewUseHostname.checked,
+                    hostname: (wizardNewHostname.value || '').trim(),
+                } : null,
+            };
+
+            try {
+                const response = await fetch(`/api/wizard/save/${encodeURIComponent(wizardProfileName)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || (wizardEditMode ? 'Profile update failed' : 'Profile creation failed'));
+                }
+
+                profileWizard.classList.add('hidden');
+                updateBodyScrollLock();
+                showSuccess(wizardEditMode
+                    ? `Profile ${wizardProfileName} updated successfully.`
+                    : `Profile ${wizardProfileName} created successfully.`);
+
+                await loadServiceInfo();
+                startDashboardAutoRefresh();
+                mainContent.classList.remove('hidden');
+            } catch (error) {
+                wizardError.textContent = error.message;
+                wizardError.classList.remove('hidden');
+            }
+        }
+
+        // Event listeners
+        if (deployBtn) {
+            deployBtn.addEventListener('click', deployService);
+        }
+        if (forceDeployBtn) {
+            forceDeployBtn.addEventListener('click', forceDeployService);
+        }
+        if (scaleBtn) {
+            scaleBtn.addEventListener('click', scaleService);
+        }
+        logsBtn.addEventListener('click', viewLogs);
+        eventsBtn.addEventListener('click', viewEvents);
+        tailBtn.addEventListener('click', startTailLogs);
+        stopTailBtn.addEventListener('click', stopTailLogs);
+        deleteBtn.addEventListener('click', deleteService);
+        if (editConfigBtn) {
+            editConfigBtn.addEventListener('click', () => openEditConfigurationWizard());
+        }
+        document.addEventListener('keydown', (event) => {
+            const key = String(event.key || '').toLowerCase();
+            const tailIsActive = stopTailBtn && !stopTailBtn.classList.contains('hidden');
+            const operationModalOpen = operationModal && !operationModal.classList.contains('hidden');
+
+            if (key === 'escape' && operationModalOpen) {
+                event.preventDefault();
+                if (tailIsActive) {
+                    stopTailLogs();
+                } else {
+                    closeOperationModal();
+                }
+                return;
+            }
+
+            const isStopShortcut = (event.ctrlKey || event.metaKey) && key === 'c';
+
+            if (!isStopShortcut || !tailIsActive) {
+                return;
+            }
+
+            if (isEditableElement(event.target)) {
+                return;
+            }
+
+            event.preventDefault();
+            stopTailLogs();
+        });
+
+        // Socket events
+        socket.on('log-data', (data) => {
+            appendToLogs(data, 'log', {
+                autoScroll: false,
+                prepend: isTailStreaming,
+                reverseLines: isTailStreaming,
+            });
+        });
+
+        socket.on('log-error', (data) => {
+            appendToLogs(data, 'error', {
+                autoScroll: false,
+                prepend: isTailStreaming,
+                reverseLines: isTailStreaming,
+            });
+        });
+
+        socket.on('server-shutdown', () => {
+            handleServerStopped();
+        });
+
+        socket.on('disconnect', () => {
+            setTimeout(() => {
+                if (!socket.connected) {
+                    handleServerStopped();
+                }
+            }, 1200);
+        });
+
+        socket.on('connect', () => {
+            if (serverStopCloseTimer) {
+                clearTimeout(serverStopCloseTimer);
+                serverStopCloseTimer = null;
+            }
+        });
+
+        function handleServerStopped() {
+            if (serverStopCloseTimer) return;
+
+            serverStopCloseTimer = setTimeout(() => {
+                try {
+                    window.open('', '_self');
+                    window.close();
+                } catch (error) {
+                    // Ignore close errors
+                }
+
+                setTimeout(() => {
+                    try {
+                        window.location.replace('about:blank');
+                    } catch (error) {
+                        // Ignore navigation errors
+                    }
+                }, 50);
+            }, 500);
+        }
+
+        async function loadServiceInfo() {
+            setRefreshLoading(true);
+            try {
+                const response = await fetch(`/api/service/info/${currentProfile}?_ts=${Date.now()}`, {
+                    cache: 'no-store'
+                });
+                const info = await response.json();
+
+                if (response.ok) {
+                    currentServiceInfo = info;
+                    displayServiceInfo(info);
+                    await loadDashboardAreas();
+                    await loadDeletePermissions();
+                } else {
+                    throw new Error(info.error);
+                }
+            } catch (error) {
+                throw error;
+            } finally {
+                setRefreshLoading(false);
+            }
+        }
+
+        function startDashboardAutoRefresh() {
+            if (dashboardRefreshTimer) {
+                clearInterval(dashboardRefreshTimer);
+            }
+
+            dashboardRefreshTimer = setInterval(() => {
+                refreshDashboardSections();
+            }, AUTO_REFRESH_MS);
+        }
+
+        async function refreshDashboardSections(force = false) {
+            if (!currentProfile || isDashboardRefreshing || (!force && isLoading)) {
+                return;
+            }
+
+            isDashboardRefreshing = true;
+            try {
+                await loadServiceInfo();
+            } catch (error) {
+                // Keep UI running even if one refresh fails
+            } finally {
+                isDashboardRefreshing = false;
+            }
+        }
+
+        function setRefreshLoading(loading) {
+            if (!refreshIcon) return;
+            if (loading) {
+                refreshIcon.classList.add('fa-spin');
+            } else {
+                refreshIcon.classList.remove('fa-spin');
+            }
+        }
+
+        async function loadDeletePermissions() {
+            try {
+                const response = await fetch(`/api/service/permissions/${currentProfile}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Unable to load permissions');
+                }
+
+                deletePermissionInfo = data;
+                if (data.allowed) {
+                    deleteBtn.classList.remove('hidden');
+                } else {
+                    deleteBtn.classList.add('hidden');
+                }
+            } catch (error) {
+                deleteBtn.classList.add('hidden');
+                deletePermissionInfo = null;
+            }
+        }
+
+        async function loadDashboardAreas() {
+            try {
+                const response = await fetch(`/api/service/dashboard/${currentProfile}?_ts=${Date.now()}`, {
+                    cache: 'no-store'
+                });
+                const dashboard = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(dashboard.error || 'Unable to load dashboard data');
+                }
+
+                renderResourceDetails(dashboard.resourceDetails || []);
+                renderServiceEvents(dashboard.events || []);
+                renderMetricsTable(cpuMetricsBody, dashboard.metrics?.cpu || [], 'CPU');
+                renderMetricsTable(memoryMetricsBody, dashboard.metrics?.memory || [], 'Memory');
+                renderMetricChart(cpuMetricChart, dashboard.metrics?.cpu || []);
+                renderMetricChart(memoryMetricChart, dashboard.metrics?.memory || []);
+                renderAdvancedMetrics(dashboard.advancedMetrics || {});
+
+                const typeLabel = dashboard.type === 'scheduled-task' ? 'Scheduled Task' : 'ECS Service';
+                const typeClass = dashboard.type === 'scheduled-task'
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-green-100 text-green-800';
+                if (serviceTypeLabel) {
+                    serviceTypeLabel.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeClass}`;
+                    serviceTypeLabel.textContent = typeLabel;
+                }
+            } catch (error) {
+                showActionError('Failed to load dashboard areas: ' + error.message);
+                setEmptyTableState(resourceDetailsBody, 3, 'Unable to load resource details');
+                setEmptyTableState(serviceEventsBody, 3, 'Unable to load service events');
+                setEmptyTableState(cpuMetricsBody, 4, 'Unable to load CPU metrics');
+                setEmptyTableState(memoryMetricsBody, 4, 'Unable to load memory metrics');
+                setEmptyChartState(cpuMetricChart, 'CPU metrics unavailable');
+                setEmptyChartState(memoryMetricChart, 'Memory metrics unavailable');
+                setEmptyAdvancedMetricsState('Advanced metrics unavailable');
+            }
+        }
+
+        function setEmptyAdvancedMetricsState(message = 'No advanced metrics available') {
+            if (!advancedMetricsGrid) return;
+            advancedMetricsGrid.innerHTML = `
+                <div class="md:col-span-2 xl:col-span-3 border border-gray-200 rounded-lg p-4 text-sm text-gray-500 italic">${escapeHtml(message)}</div>
+            `;
+        }
+
+        function createAdvancedMetricCard(title, value, subtitle = '', tone = 'neutral') {
+            const toneClassMap = {
+                good: 'text-green-700 bg-green-50 border-green-200',
+                warn: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+                bad: 'text-red-700 bg-red-50 border-red-200',
+                neutral: 'text-gray-900 bg-gray-50 border-gray-200',
+            };
+
+            const toneClass = toneClassMap[tone] || toneClassMap.neutral;
+
+            return `
+                <div class="border rounded-lg p-4 ${toneClass}">
+                    <div class="text-xs uppercase tracking-wide opacity-80 mb-1">${escapeHtml(title)}</div>
+                    <div class="text-lg font-semibold">${escapeHtml(String(value))}</div>
+                    <div class="text-xs mt-1 opacity-80 whitespace-pre-wrap">${escapeHtml(subtitle)}</div>
+                </div>
+            `;
+        }
+
+        function renderAdvancedMetrics(advancedMetrics) {
+            if (!advancedMetricsGrid) return;
+
+            const deployment = advancedMetrics.deployment || {};
+            const targetHealth = advancedMetrics.targetHealth || {};
+            const alb = advancedMetrics.alb || {};
+            const runtimeSignals = advancedMetrics.runtimeSignals || {};
+            const trend = Array.isArray(advancedMetrics.runningDesiredTrend) ? advancedMetrics.runningDesiredTrend : [];
+
+            const restartCount = Number(advancedMetrics.restartCount || 0);
+            const oomEvents = Number(runtimeSignals.oomEvents || 0);
+            const unhealthyTargets = Number(targetHealth.unhealthy || 0);
+            const healthyTargets = Number(targetHealth.healthy || 0);
+            const initialTargets = Number(targetHealth.initial || 0);
+            const requestCount = Number(alb.requestCount || 0);
+            const target5xxCount = Number(alb.target5xxCount || 0);
+            const p95Latency = alb.targetResponseTimeP95Ms;
+            const deploymentProgress = Number(deployment.progressPercent || 0);
+
+            const latestTrend = trend.length ? trend[trend.length - 1] : null;
+            const trendValue = latestTrend
+                ? `${Number(latestTrend.running ?? 0).toFixed(1)} / ${Number(latestTrend.desired ?? 0).toFixed(1)}`
+                : 'N/A';
+
+            const cards = [
+                createAdvancedMetricCard(
+                    'Deployment Progress',
+                    `${deploymentProgress}%`,
+                    `Rollout: ${deployment.rolloutState || 'UNKNOWN'}\nRunning/Desired/Pending: ${deployment.runningCount || 0}/${deployment.desiredCount || 0}/${deployment.pendingCount || 0}`,
+                    deploymentProgress >= 100 ? 'good' : 'warn'
+                ),
+                createAdvancedMetricCard(
+                    'Task Restarts (events)',
+                    restartCount,
+                    'Heuristic from recent service events',
+                    restartCount === 0 ? 'good' : 'warn'
+                ),
+                createAdvancedMetricCard(
+                    'OOM / Exit Signals',
+                    `${oomEvents} OOM`,
+                    (runtimeSignals.exitSignals || []).slice(0, 2).join('\n') || 'No recent exit signals',
+                    oomEvents > 0 ? 'bad' : 'good'
+                ),
+                createAdvancedMetricCard(
+                    'ALB Request Throughput',
+                    requestCount,
+                    'Total requests in sampled window',
+                    'neutral'
+                ),
+                createAdvancedMetricCard(
+                    'ALB 5xx Errors',
+                    target5xxCount,
+                    'Target-side HTTP 5xx count',
+                    target5xxCount > 0 ? 'bad' : 'good'
+                ),
+                createAdvancedMetricCard(
+                    'Latency (p95)',
+                    p95Latency === null || p95Latency === undefined ? 'N/A' : `${p95Latency} ms`,
+                    'Estimated from TargetResponseTime',
+                    p95Latency !== null && p95Latency > 1000 ? 'warn' : 'neutral'
+                ),
+                createAdvancedMetricCard(
+                    'Target Health',
+                    `${healthyTargets} healthy / ${unhealthyTargets} unhealthy`,
+                    `Initial: ${initialTargets}\nTop reasons: ${(targetHealth.reasons || []).map(item => `${item.reason} (${item.count})`).join(', ') || 'None'}`,
+                    unhealthyTargets > 0 ? 'bad' : 'good'
+                ),
+                createAdvancedMetricCard(
+                    'Running/Desired Trend',
+                    trendValue,
+                    `Points: ${trend.length}`,
+                    'neutral'
+                ),
+            ];
+
+            advancedMetricsGrid.innerHTML = cards.join('');
+        }
+
+        function renderResourceDetails(details) {
+            if (!details || details.length === 0) {
+                setEmptyTableState(resourceDetailsBody, 3, 'No resource details available');
+                return;
+            }
+
+            resourceDetailsBody.innerHTML = '';
+            details.forEach((item) => {
+                const label = item.label || 'N/A';
+                const value = item.value || 'N/A';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2 align-top text-sm font-medium text-gray-700">${escapeHtml(label)}</td>
+                    <td class="px-4 py-2 align-top text-sm text-gray-900 font-mono break-all">${escapeHtml(value)}</td>
+                    <td class="px-4 py-2 align-top text-right">
+                        <button
+                            type="button"
+                            data-copy-resource
+                            class="inline-flex items-center gap-1 border border-gray-300 text-gray-700 px-2 py-1 rounded text-xs font-medium hover:bg-gray-50"
+                            aria-label="Copy ${escapeHtml(label)} value"
+                            title="Copy value">
+                            <i class="fa-regular fa-copy"></i>
+                            <span>Copy</span>
+                        </button>
+                    </td>
+                `;
+                const copyBtn = row.querySelector('[data-copy-resource]');
+                if (copyBtn) {
+                    copyBtn.dataset.copyResource = String(value);
+                }
+                resourceDetailsBody.appendChild(row);
+            });
+        }
+
+        async function copyToClipboard(text) {
+            const value = String(text ?? '');
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(value);
+                return;
+            }
+
+            const textArea = document.createElement('textarea');
+            textArea.value = value;
+            textArea.setAttribute('readonly', '');
+            textArea.style.position = 'absolute';
+            textArea.style.left = '-9999px';
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+        }
+
+        function renderServiceEvents(events) {
+            if (!events || events.length === 0) {
+                setEmptyTableState(serviceEventsBody, 3, 'No service events available');
+                return;
+            }
+
+            serviceEventsBody.innerHTML = '';
+            events.forEach((event) => {
+                const level = (event.level || 'info').toLowerCase();
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2 align-top text-xs text-gray-500 whitespace-nowrap">${escapeHtml(formatDateTime(event.timestamp))}</td>
+                    <td class="px-4 py-2 align-top">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getEventBadgeClass(level)}">${escapeHtml(level.toUpperCase())}</span>
+                    </td>
+                    <td class="px-4 py-2 align-top text-sm text-gray-900 whitespace-pre-wrap break-words">${escapeHtml(event.message || '')}</td>
+                `;
+                serviceEventsBody.appendChild(row);
+            });
+        }
+
+        function renderMetricsTable(targetBody, points, metricName) {
+            if (!targetBody) return;
+            if (!points || points.length === 0) {
+                setEmptyTableState(targetBody, 4, `${metricName} metrics not available`);
+                return;
+            }
+
+            targetBody.innerHTML = '';
+            points.slice(-20).reverse().forEach((point) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-2 text-xs text-gray-500 whitespace-nowrap">${escapeHtml(formatMetricTime(point.timestamp))}</td>
+                    <td class="px-4 py-2 text-sm text-gray-900">${formatPercent(point.average)}</td>
+                    <td class="px-4 py-2 text-sm text-gray-900">${formatPercent(point.minimum)}</td>
+                    <td class="px-4 py-2 text-sm text-gray-900">${formatPercent(point.maximum)}</td>
+                `;
+                targetBody.appendChild(row);
+            });
+        }
+
+        function setEmptyChartState(targetSvg, label) {
+            if (!targetSvg) return;
+            metricChartData.set(targetSvg.id, []);
+            targetSvg.innerHTML = `
+                <rect x="0" y="0" width="100" height="28" fill="#f9fafb"></rect>
+                <text x="50" y="16" text-anchor="middle" font-size="3.2" fill="#6b7280">${escapeHtml(label)}</text>
+            `;
+
+            bindMetricTooltip(targetSvg);
+        }
+
+        function renderMetricChart(targetSvg, points) {
+            if (!targetSvg) return;
+            if (!points || points.length === 0) {
+                setEmptyChartState(targetSvg, 'No data');
+                return;
+            }
+
+            const usablePoints = points.slice(-20).filter(point => (
+                point &&
+                Number.isFinite(Number(point.average)) &&
+                Number.isFinite(Number(point.minimum)) &&
+                Number.isFinite(Number(point.maximum))
+            ));
+
+            if (!usablePoints.length) {
+                setEmptyChartState(targetSvg, 'No data');
+                return;
+            }
+
+            metricChartData.set(targetSvg.id, usablePoints);
+
+            const minValue = Math.min(...usablePoints.map(point => Number(point.minimum)));
+            const maxValue = Math.max(...usablePoints.map(point => Number(point.maximum)));
+            const valueRange = Math.max(1, maxValue - minValue);
+
+            const toX = (index, total) => {
+                if (total <= 1) return 0;
+                return (index / (total - 1)) * 100;
+            };
+
+            const toY = (value) => {
+                const normalized = (Number(value) - minValue) / valueRange;
+                return 26 - (normalized * 22);
+            };
+
+            const buildPolyline = (getter) => usablePoints
+                .map((point, index) => `${toX(index, usablePoints.length)},${toY(getter(point))}`)
+                .join(' ');
+
+            const avgLine = buildPolyline(point => point.average);
+            const minLine = buildPolyline(point => point.minimum);
+            const maxLine = buildPolyline(point => point.maximum);
+
+            targetSvg.innerHTML = `
+                <rect x="0" y="0" width="100" height="28" fill="#f9fafb"></rect>
+                <line x1="0" y1="26" x2="100" y2="26" stroke="#e5e7eb" stroke-width="0.4"></line>
+                <polyline points="${minLine}" fill="none" stroke="#f59e0b" stroke-width="0.8"></polyline>
+                <polyline points="${maxLine}" fill="none" stroke="#ef4444" stroke-width="0.8"></polyline>
+                <polyline points="${avgLine}" fill="none" stroke="#10b981" stroke-width="1"></polyline>
+            `;
+
+            bindMetricTooltip(targetSvg);
+        }
+
+        function initMetricTooltip() {
+            metricTooltip = document.createElement('div');
+            metricTooltip.id = 'metricTooltip';
+            metricTooltip.className = 'fixed hidden z-50 bg-gray-900 text-white text-xs rounded px-2 py-1 shadow-lg pointer-events-none';
+            document.body.appendChild(metricTooltip);
+        }
+
+        function bindMetricTooltip(targetSvg) {
+            if (targetSvg.dataset.tooltipBound === 'true') {
+                return;
+            }
+
+            targetSvg.dataset.tooltipBound = 'true';
+
+            targetSvg.addEventListener('mousemove', (event) => {
+                const points = metricChartData.get(targetSvg.id) || [];
+                if (!points.length || !metricTooltip) {
+                    hideMetricTooltip();
+                    return;
+                }
+
+                const rect = targetSvg.getBoundingClientRect();
+                if (!rect.width) {
+                    hideMetricTooltip();
+                    return;
+                }
+
+                const mouseX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+                const ratio = mouseX / rect.width;
+                const index = Math.round(ratio * (points.length - 1));
+                const point = points[index];
+
+                if (!point) {
+                    hideMetricTooltip();
+                    return;
+                }
+
+                showMetricTooltip(
+                    `${escapeHtml(formatMetricTime(point.timestamp))}<br>Avg: ${escapeHtml(formatPercent(point.average))} · Min: ${escapeHtml(formatPercent(point.minimum))} · Max: ${escapeHtml(formatPercent(point.maximum))}`,
+                    event.clientX + 12,
+                    event.clientY + 12,
+                    'default'
+                );
+            });
+
+            targetSvg.addEventListener('mouseleave', () => {
+                hideMetricTooltip();
+            });
+        }
+
+        function bindProfileTooltip() {
+            if (!profileName) {
+                return;
+            }
+
+            const profileNameText = profileName.querySelector('div');
+            if (!profileNameText || profileNameText.dataset.tooltipBound === 'true') {
+                return;
+            }
+
+            profileNameText.dataset.tooltipBound = 'true';
+
+            profileNameText.addEventListener('mousemove', (event) => {
+                if (!profileHoverText) {
+                    hideMetricTooltip();
+                    return;
+                }
+
+                showMetricTooltip(escapeHtml(profileHoverText), event.clientX, event.clientY - 12, 'above');
+            });
+
+            profileNameText.addEventListener('mouseleave', () => {
+                hideMetricTooltip();
+            });
+        }
+
+        function showMetricTooltip(content, x, y, mode = 'default') {
+            if (!metricTooltip) return;
+
+            metricTooltip.innerHTML = content;
+            metricTooltip.classList.remove('hidden');
+
+            if (mode === 'above') {
+                metricTooltip.style.left = `${x}px`;
+                metricTooltip.style.top = `${y}px`;
+                metricTooltip.style.transform = 'translate(-50%, -100%)';
+            } else {
+                metricTooltip.style.left = `${x}px`;
+                metricTooltip.style.top = `${y}px`;
+                metricTooltip.style.transform = 'none';
+            }
+        }
+
+        function hideMetricTooltip() {
+            if (!metricTooltip) return;
+            metricTooltip.classList.add('hidden');
+            metricTooltip.style.transform = 'none';
+        }
+
+        function setEmptyTableState(targetBody, colspan, text) {
+            if (!targetBody) return;
+            targetBody.innerHTML = `<tr><td colspan="${colspan}" class="px-4 py-6 text-sm text-gray-500 italic">${escapeHtml(text)}</td></tr>`;
+        }
+
+        function getEventBadgeClass(level) {
+            const classes = {
+                success: 'bg-green-100 text-green-800',
+                error: 'bg-red-100 text-red-800',
+                warning: 'bg-yellow-100 text-yellow-800',
+                info: 'bg-blue-100 text-blue-800'
+            };
+            return classes[level] || classes.info;
+        }
+
+        function formatDateTime(value) {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value);
+            return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        }
+
+        function formatDashboardDateTime(value) {
+            if (!value) return 'N/A';
+
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value);
+
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = months[date.getMonth()];
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+        }
+
+        function formatMetricTime(value) {
+            if (!value) return 'N/A';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return String(value);
+            return date.toLocaleTimeString();
+        }
+
+        function formatPercent(value) {
+            if (value === null || value === undefined || Number.isNaN(Number(value))) {
+                return '—';
+            }
+
+            return `${Number(value).toFixed(1)}%`;
+        }
+
+        function getServiceHealthVisual(info) {
+            const statusText = String(info?.status || 'Unknown');
+            const statusLower = statusText.toLowerCase();
+            const runningCount = Number(info?.runningCount || 0);
+            const desiredCount = Number(info?.desiredCount || 0);
+            const pendingCount = Number(info?.pendingCount || 0);
+
+            if (statusLower === 'not deployed') {
+                return {
+                    badgeClass: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800',
+                    iconClass: 'fa-solid fa-circle-minus',
+                    label: 'Not deployed',
+                    valueClass: 'text-gray-900',
+                };
+            }
+
+            if (runningCount === 0) {
+                return {
+                    badgeClass: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800',
+                    iconClass: 'fa-solid fa-circle-xmark',
+                    label: 'Down',
+                    valueClass: 'text-red-700',
+                };
+            }
+
+            if (pendingCount > 0 && runningCount < desiredCount) {
+                const pendingLabel = 'Degraded';
+                return {
+                    badgeClass: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800',
+                    iconClass: 'fa-solid fa-triangle-exclamation',
+                    label: pendingLabel,
+                    valueClass: 'text-yellow-700',
+                };
+            }
+
+            if (runningCount >= desiredCount) {
+                return {
+                    badgeClass: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800',
+                    iconClass: 'fa-solid fa-circle-check',
+                    label: 'Healthy',
+                    valueClass: 'text-green-700',
+                };
+            }
+
+            const mismatchLabel = runningCount > desiredCount ? 'Overprovisioned' : 'Degraded';
+            return {
+                badgeClass: 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800',
+                iconClass: 'fa-solid fa-triangle-exclamation',
+                label: mismatchLabel,
+                valueClass: 'text-yellow-700',
+            };
+        }
+
+        function displayServiceInfo(info) {
+            if (!serviceName || !serviceStatus || !serviceInfo) return;
+            const config = info.config || {};
+            const healthVisual = getServiceHealthVisual(info);
+            const serviceModeLabel = config.new_service ? 'New Service' : 'Existing Service';
+            const awsProfile = config.profile || 'default';
+            const containerMemory = config.container_memory ?? 'N/A';
+            const cpuUnits = config.cpu_units ?? 'N/A';
+            const appPort = config.app_port ?? 'N/A';
+            const hostPort = config.host_port ?? 'N/A';
+            const hostPortDisplay = Number(hostPort) === 0 ? 'dynamic' : hostPort;
+            const localPort = config.local_port ?? 'N/A';
+            const dockerfilePath = config.dockerfile || 'N/A';
+
+            // Update header with service name and status
+            serviceName.querySelector('div').textContent = info.serviceName || 'N/A';
+            serviceName.classList.remove('hidden');
+
+            const status = info.status || 'Unknown';
+            serviceStatus.innerHTML = `
+                <span class="${healthVisual.badgeClass}">
+                    <i class="${healthVisual.iconClass}"></i>
+                    ${escapeHtml(healthVisual.label)}
+                </span>
+            `;
+            serviceStatus.classList.remove('hidden');
+
+            const isDeployed = String(status).toLowerCase() !== 'not deployed';
+            if (topActionButtons) {
+                topActionButtons.classList.toggle('hidden', !isDeployed);
+            }
+
+            // Update service overview
+            serviceInfo.innerHTML = `
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Task Definition</div>
+                    <div class="font-medium text-gray-900 truncate">
+                        ${info.taskDefinition || 'N/A'}
+                        ${info.taskDefinitionVersion && info.taskDefinitionVersion !== 'N/A'
+                    ? `<span class="ml-2 text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">v${escapeHtml(info.taskDefinitionVersion)}</span>`
+                    : ''}
+                    </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Running / Desired</div>
+                    <div class="font-medium ${healthVisual.valueClass} flex items-center gap-2">
+                        <i class="${healthVisual.iconClass}"></i>
+                        <span>${info.runningCount || 0} / ${info.desiredCount || 0}</span>
+                    </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Pending Tasks</div>
+                    <div class="font-medium text-gray-900">${info.pendingCount || 0}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Created</div>
+                    <div class="font-medium text-gray-900">${formatDateTime(info.createdAt)}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Last Deployment</div>
+                    <div class="font-medium text-gray-900">${formatDashboardDateTime(info.lastDeploymentAt)}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">AWS Profile</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(String(awsProfile))}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Container Memory</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(String(containerMemory))}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">CPU Units</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(String(cpuUnits))}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Ports (App / Host / Local)</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(String(appPort))} / ${escapeHtml(String(hostPortDisplay))} / ${escapeHtml(String(localPort))}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Dockerfile</div>
+                    <div class="font-medium text-gray-900 break-all">${escapeHtml(String(dockerfilePath))}</div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-sm text-gray-500 mb-1">Service Mode</div>
+                    <div class="font-medium text-gray-900">${escapeHtml(serviceModeLabel)}</div>
+                </div>
+            `;
+        }
+
+        async function deployService() {
+            if (!currentProfile) return;
+
+            setLoading(true);
+            openOperationModal('Deploy Service');
+            clearLogs();
+            appendToLogs('Starting deployment...', 'info');
+
+            try {
+                const tagPrompt = await openDialog({
+                    title: 'Deploy Service',
+                    message: 'Optional: enter deployment tag (leave empty for git short hash).',
+                    confirmText: 'Start Deploy',
+                    cancelText: 'Cancel',
+                    fields: [{
+                        name: 'tag',
+                        label: 'Deployment Tag',
+                        type: 'text',
+                        placeholder: 'Leave empty to use git short hash',
+                        value: '',
+                    }],
+                });
+
+                if (!tagPrompt.confirmed) {
+                    appendToLogs('Deployment cancelled.', 'warning');
+                    return;
+                }
+
+                const defaultTag = (tagPrompt.values.tag || '').trim();
+                const response = await fetch(`/api/operations/deploy/${currentProfile}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tag: defaultTag || undefined })
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error);
+                }
+
+                await pollOperation(result.jobId, async (finalJob) => {
+                    if (finalJob.status === 'success') {
+                        showSuccess('Service deployed successfully!');
+                        await loadServiceInfo();
+                    } else {
+                        const deployError = finalJob.error?.message || 'Deployment failed';
+                        showActionError(`Deployment failed: ${deployError}`);
+
+                        if (finalJob.error?.code === 'TAG_EXISTS' || finalJob.error?.code === 'TAG_REQUIRED') {
+                            appendToLogs('Deployment requires a new tag. Re-run Deploy with a different tag.', 'warning');
+                        }
+                    }
+                });
+            } catch (error) {
+                appendToLogs(`❌ Deployment failed: ${error.message}`, 'error');
+                showActionError('Deployment failed: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function forceDeployService() {
+            if (!currentProfile) return;
+
+            const confirmation = await openDialog({
+                title: 'Confirm Force Deploy',
+                message: 'Force a new deployment for this ECS service?',
+                confirmText: 'Force Deploy',
+                cancelText: 'No',
+                danger: true,
+                defaultAction: 'cancel',
+            });
+
+            if (!confirmation.confirmed) {
+                return;
+            }
+
+            setLoading(true);
+            openOperationModal('Force Deploy Service');
+            clearLogs();
+            appendToLogs('Triggering force deployment...', 'info');
+
+            try {
+                const response = await fetch(`/api/operations/force-deploy/${currentProfile}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error);
+                }
+
+                await pollOperation(result.jobId, async (finalJob) => {
+                    if (finalJob.status === 'success') {
+                        showSuccess('Force deployment triggered successfully!');
+                        await loadServiceInfo();
+                    } else {
+                        const deployError = finalJob.error?.message || 'Force deployment failed';
+                        showActionError(`Force deployment failed: ${deployError}`);
+                    }
+                });
+            } catch (error) {
+                appendToLogs(`❌ Force deployment failed: ${error.message}`, 'error');
+                showActionError('Force deployment failed: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function scaleService() {
+            if (!currentProfile) return;
+
+            const desiredCountPrompt = await openDialog({
+                title: 'Scale Service Tasks',
+                message: 'Enter desired task count (non-negative integer).',
+                confirmText: 'Update Tasks',
+                cancelText: 'Cancel',
+                fields: [{
+                    name: 'desiredCount',
+                    label: 'Desired Task Count',
+                    type: 'number',
+                    value: '1',
+                    min: 0,
+                }],
+            });
+
+            if (!desiredCountPrompt.confirmed) {
+                return;
+            }
+
+            const desiredCountRaw = desiredCountPrompt.values.desiredCount;
+
+            const desiredCount = Number(desiredCountRaw);
+            if (!Number.isInteger(desiredCount) || desiredCount < 0) {
+                showActionError('Desired task count must be a non-negative integer.');
+                return;
+            }
+
+            setLoading(true);
+            openOperationModal('Scale Service Tasks');
+            clearLogs();
+            appendToLogs(`Updating desired task count to ${desiredCount}...`, 'info');
+
+            try {
+                const response = await fetch(`/api/operations/scale/${currentProfile}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ desiredCount }),
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error);
+                }
+
+                await pollOperation(result.jobId, async (finalJob) => {
+                    if (finalJob.status === 'success') {
+                        showSuccess(`Desired task count updated to ${desiredCount}.`);
+                        await loadServiceInfo();
+                    } else {
+                        const scaleError = finalJob.error?.message || 'Scaling failed';
+                        showActionError(`Scaling failed: ${scaleError}`);
+                    }
+                });
+            } catch (error) {
+                appendToLogs(`❌ Scaling failed: ${error.message}`, 'error');
+                showActionError('Scaling failed: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function viewLogs() {
+            if (!currentProfile) return;
+
+            openOperationModal('Service Logs');
+            operationListMode = 'logs';
+            operationListOffset = 0;
+            operationListHasMore = false;
+            operationListLoading = false;
+            clearLogs();
+            appendToLogs('Loading logs...', 'info');
+
+            try {
+                clearLogs();
+                await loadMoreOperationList();
+            } catch (error) {
+                appendToLogs(`❌ Failed to load logs: ${error.message}`, 'error');
+                showActionError('Failed to load logs: ' + error.message);
+            }
+        }
+
+        async function viewEvents() {
+            if (!currentProfile) return;
+
+            openOperationModal('Service Events');
+            operationListMode = 'events';
+            operationListOffset = 0;
+            operationListHasMore = false;
+            operationListLoading = false;
+            clearLogs();
+            appendToLogs('Loading events...', 'info');
+
+            try {
+                clearLogs();
+                await loadMoreOperationList();
+            } catch (error) {
+                appendToLogs(`❌ Failed to load events: ${error.message}`, 'error');
+                showActionError('Failed to load events: ' + error.message);
+            }
+        }
+
+        function startTailLogs() {
+            if (!currentProfile) return;
+
+            openOperationModal('Tail Logs');
+            operationListMode = null;
+            operationListOffset = 0;
+            operationListHasMore = false;
+            operationListLoading = false;
+            clearLogs();
+            appendToLogs('Starting real-time log tail...', 'info');
+
+            socket.emit('start-log-tail', currentProfile);
+            isTailStreaming = true;
+
+            tailBtn.classList.add('hidden');
+            stopTailBtn.classList.remove('hidden');
+        }
+
+        function stopTailLogs() {
+            socket.emit('stop-log-tail');
+            isTailStreaming = false;
+
+            appendToLogs('Log tail stopped.', 'info');
+
+            tailBtn.classList.remove('hidden');
+            stopTailBtn.classList.add('hidden');
+            closeOperationModal();
+        }
+
+        async function loadMoreOperationList() {
+            if (!operationListMode || !currentProfile || operationListLoading) {
+                return;
+            }
+
+            operationListLoading = true;
+            const mode = operationListMode;
+            const offset = operationListOffset;
+
+            try {
+                const endpoint = mode === 'events' ? 'events' : 'logs';
+                const response = await fetch(`/api/service/${endpoint}/${currentProfile}?offset=${offset}&limit=${OUTPUT_PAGE_SIZE}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Failed to load ${mode}`);
+                }
+
+                const items = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+                const hasMore = Array.isArray(data) ? false : !!data.hasMore;
+                const orderedItems = sortTimestampedLinesNewestFirst(items);
+
+                if (offset === 0) {
+                    clearLogs();
+                }
+
+                if (!orderedItems.length) {
+                    if (offset === 0) {
+                        addPlaceholderRow(mode === 'events' ? 'No events available.' : 'No logs available.');
+                    }
+                    operationListHasMore = false;
+                    return;
+                }
+
+                orderedItems.forEach((entry) => {
+                    appendToLogs(entry, 'log', { autoScroll: false });
+                });
+
+                operationListOffset += orderedItems.length;
+                operationListHasMore = hasMore;
+            } finally {
+                operationListLoading = false;
+            }
+        }
+
+        function sortTimestampedLinesNewestFirst(lines) {
+            return (lines || [])
+                .map((line, index) => {
+                    const parsed = parseTimestampedMessage(String(line));
+                    const timestamp = Date.parse(parsed.time);
+                    return {
+                        line,
+                        index,
+                        timestamp: Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY,
+                    };
+                })
+                .sort((a, b) => {
+                    if (b.timestamp !== a.timestamp) {
+                        return b.timestamp - a.timestamp;
+                    }
+                    return a.index - b.index;
+                })
+                .map(entry => entry.line);
+        }
+
+        function isEditableElement(element) {
+            if (!element) return false;
+            const tagName = (element.tagName || '').toLowerCase();
+            return tagName === 'input' || tagName === 'textarea' || element.isContentEditable;
+        }
+
+        async function deleteService() {
+            if (!currentProfile) return;
+
+            if (!deletePermissionInfo || !deletePermissionInfo.allowed) {
+                showActionError('Delete is not allowed for this profile.');
+                return;
+            }
+
+            const expectedServiceName = deletePermissionInfo.serviceName;
+            const deletePrompt = await openDialog({
+                title: 'Delete Service',
+                message: 'This action is permanent. Complete both confirmations to continue.',
+                confirmText: 'Delete Service',
+                cancelText: 'Cancel',
+                danger: true,
+                fields: [{
+                    name: 'confirmServiceName',
+                    label: `Type service name: ${expectedServiceName}`,
+                    type: 'text',
+                    value: '',
+                }, {
+                    name: 'confirmPhrase',
+                    label: 'Type DELETE to confirm',
+                    type: 'text',
+                    value: '',
+                }],
+            });
+
+            if (!deletePrompt.confirmed) {
+                return;
+            }
+
+            const enteredServiceName = deletePrompt.values.confirmServiceName;
+            if (enteredServiceName !== expectedServiceName) {
+                showActionError('Service name confirmation failed.');
+                return;
+            }
+
+            const confirmPhrase = deletePrompt.values.confirmPhrase;
+            if (confirmPhrase !== 'DELETE') {
+                showActionError('Delete confirmation phrase did not match.');
+                return;
+            }
+
+            setLoading(true);
+            openOperationModal('Delete Service');
+            clearLogs();
+            appendToLogs('Deleting service...', 'info');
+
+            try {
+                const response = await fetch(`/api/operations/delete/${currentProfile}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        confirmServiceName: enteredServiceName,
+                        confirmPhrase,
+                    })
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error);
+                }
+
+                await pollOperation(result.jobId, async (finalJob) => {
+                    if (finalJob.status === 'success') {
+                        appendToLogs('Service deleted successfully.', 'success');
+                        showSuccess('Service deleted successfully!');
+
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        const deleteError = finalJob.error?.message || 'Delete failed';
+                        appendToLogs(`Delete failed: ${deleteError}`, 'error');
+                        showActionError(`Delete failed: ${deleteError}`);
+                    }
+                });
+            } catch (error) {
+                appendToLogs(`❌ Failed to delete service: ${error.message}`, 'error');
+                showActionError('Failed to delete service: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function pollOperation(jobId, onComplete) {
+            if (currentOperationPoller) {
+                clearInterval(currentOperationPoller);
+                currentOperationPoller = null;
+            }
+
+            currentOperationLastEvent = 0;
+
+            const fetchJob = async () => {
+                const response = await fetch(`/api/operations/${jobId}`);
+                const job = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(job.error || 'Failed to read operation status');
+                }
+
+                const events = job.events || [];
+                events.slice(currentOperationLastEvent).forEach((event) => {
+                    appendToLogs(`[${event.timestamp}] ${event.message}`, event.level || 'info');
+                });
+                currentOperationLastEvent = events.length;
+
+                if (job.status === 'success' || job.status === 'failed') {
+                    if (currentOperationPoller) {
+                        clearInterval(currentOperationPoller);
+                        currentOperationPoller = null;
+                    }
+                    await onComplete(job);
+                }
+            };
+
+            await fetchJob();
+            currentOperationPoller = setInterval(() => {
+                fetchJob().catch((error) => {
+                    appendToLogs(error.message, 'error');
+                    if (currentOperationPoller) {
+                        clearInterval(currentOperationPoller);
+                        currentOperationPoller = null;
+                    }
+                });
+            }, 1000);
+        }
+
+        function openOperationModal(title) {
+            operationTitle.textContent = title;
+            operationForm.classList.add('hidden');
+            operationForm.innerHTML = '';
+            operationModal.classList.remove('hidden');
+            updateBodyScrollLock();
+        }
+
+        function closeOperationModal() {
+            operationModal.classList.add('hidden');
+            operationListMode = null;
+            operationListOffset = 0;
+            operationListHasMore = false;
+            operationListLoading = false;
+            hideMetricTooltip();
+            updateBodyScrollLock();
+        }
+
+        let dialogResolver = null;
+        let activeDialogConfig = null;
+
+        function renderDialogFields(fields = []) {
+            dialogFields.innerHTML = '';
+
+            fields.forEach((field, index) => {
+                const wrapper = document.createElement('div');
+                const inputId = `dialog-field-${field.name}`;
+                const fieldType = field.type === 'number' ? 'number' : 'text';
+
+                wrapper.innerHTML = `
+                    <label for="${inputId}" class="block text-sm font-medium text-gray-700 mb-1">${escapeHtml(field.label || field.name)}</label>
+                    <input
+                        id="${inputId}"
+                        data-dialog-field="${escapeHtml(field.name)}"
+                        type="${fieldType}"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        value="${escapeHtml(field.value ?? '')}"
+                        ${field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : ''}
+                        ${field.min !== undefined ? `min="${escapeHtml(field.min)}"` : ''}
+                    />
+                `;
+
+                dialogFields.appendChild(wrapper);
+
+                if (index === 0) {
+                    const input = wrapper.querySelector('input');
+                    setTimeout(() => input && input.focus(), 0);
+                }
+            });
+        }
+
+        function collectDialogValues() {
+            const values = {};
+            const fields = dialogFields.querySelectorAll('[data-dialog-field]');
+            fields.forEach((field) => {
+                const key = field.getAttribute('data-dialog-field');
+                values[key] = field.value;
+            });
+            return values;
+        }
+
+        function closeDialog(confirmed) {
+            if (!dialogResolver) {
+                dialogModal.classList.add('hidden');
+                updateBodyScrollLock();
+                return;
+            }
+
+            const resolver = dialogResolver;
+            const config = activeDialogConfig;
+            const values = collectDialogValues();
+
+            if (confirmed && config && typeof config.validate === 'function') {
+                const validationMessage = config.validate(values);
+                if (validationMessage) {
+                    dialogError.textContent = validationMessage;
+                    dialogError.classList.remove('hidden');
+                    return;
+                }
+            }
+
+            dialogResolver = null;
+            activeDialogConfig = null;
+            dialogModal.classList.add('hidden');
+            dialogError.classList.add('hidden');
+            dialogError.textContent = '';
+            updateBodyScrollLock();
+
+            resolver({ confirmed, values });
+        }
+
+        function openDialog(config = {}) {
+            const {
+                title = 'Confirm',
+                message = '',
+                fields = [],
+                confirmText = 'Confirm',
+                cancelText = 'Cancel',
+                danger = false,
+                defaultAction = 'confirm',
+                validate,
+            } = config;
+
+            return new Promise((resolve) => {
+                dialogResolver = resolve;
+                activeDialogConfig = { validate };
+
+                dialogTitle.textContent = title;
+                dialogMessage.textContent = message;
+                dialogConfirmBtn.textContent = confirmText;
+                dialogCancelBtn.textContent = cancelText;
+                dialogError.classList.add('hidden');
+                dialogError.textContent = '';
+
+                if (danger) {
+                    dialogConfirmBtn.className = 'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700';
+                } else {
+                    dialogConfirmBtn.className = 'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700';
+                }
+
+                renderDialogFields(fields);
+                dialogModal.classList.remove('hidden');
+                updateBodyScrollLock();
+
+                if (fields.length === 0) {
+                    if (defaultAction === 'cancel') {
+                        setTimeout(() => dialogCancelBtn.focus(), 0);
+                    } else {
+                        setTimeout(() => dialogConfirmBtn.focus(), 0);
+                    }
+                }
+            });
+        }
+
+        dialogConfirmBtn.addEventListener('click', () => closeDialog(true));
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !dialogModal.classList.contains('hidden')) {
+                closeDialog(false);
+            }
+        });
+
+        function stripAnsiCodes(value) {
+            return String(value ?? '')
+                .replace(/[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[a-zA-Z\d]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g, '')
+                .replace(/\[(?:\d{1,3}(?:;\d{1,3})*)m/g, '')
+                .replace(/\[(?:39|49)m/g, '');
+        }
+
+        function getAnsiTextClass(code) {
+            const colorMap = {
+                30: 'text-gray-900',
+                31: 'text-red-600',
+                32: 'text-green-600',
+                33: 'text-yellow-600',
+                34: 'text-blue-600',
+                35: 'text-purple-600',
+                36: 'text-cyan-600',
+                37: 'text-gray-700',
+                90: 'text-gray-500',
+                91: 'text-red-500',
+                92: 'text-green-500',
+                93: 'text-yellow-500',
+                94: 'text-blue-500',
+                95: 'text-purple-500',
+                96: 'text-cyan-500',
+                97: 'text-gray-500',
+            };
+
+            return colorMap[code] || null;
+        }
+
+        function formatAnsiToHtml(value) {
+            const source = String(value ?? '');
+            const tokenRegex = /(\u001b\[(?:\d{1,3}(?:;\d{1,3})*)m|\[(?:\d{1,3}(?:;\d{1,3})*)m)/gi;
+            let html = '';
+            let lastIndex = 0;
+            let activeClass = '';
+            let match;
+
+            while ((match = tokenRegex.exec(source)) !== null) {
+                if (match.index > lastIndex) {
+                    const plain = source.slice(lastIndex, match.index);
+                    const escaped = escapeHtml(plain);
+                    html += activeClass ? `<span class="${activeClass}">${escaped}</span>` : escaped;
+                }
+
+                const rawToken = match[0].replace(/^\u001b\[/i, '').replace(/^\[/, '').replace(/m$/i, '');
+                const codes = rawToken.split(';').map((part) => parseInt(part, 10)).filter((num) => Number.isFinite(num));
+
+                codes.forEach((code) => {
+                    if (code === 0 || code === 39 || code === 49) {
+                        activeClass = '';
+                        return;
+                    }
+
+                    const mappedClass = getAnsiTextClass(code);
+                    if (mappedClass) {
+                        activeClass = mappedClass;
+                    }
+                });
+
+                lastIndex = tokenRegex.lastIndex;
+            }
+
+            if (lastIndex < source.length) {
+                const plain = source.slice(lastIndex);
+                const escaped = escapeHtml(plain);
+                html += activeClass ? `<span class="${activeClass}">${escaped}</span>` : escaped;
+            }
+
+            return html;
+        }
+
+        function appendToLogs(text, type = 'log', options = {}) {
+            const autoScroll = options.autoScroll !== false;
+            const prepend = options.prepend === true;
+            const reverseLines = options.reverseLines === true;
+            const rawNormalized = String(text ?? '').replace(/\r\n/g, '\n');
+            const rawLines = rawNormalized.split('\n');
+            const linesToRender = reverseLines ? rawLines.reverse() : rawLines;
+
+            // Remove placeholder rows on first real output
+            if (outputTableBody.querySelector('[data-placeholder="true"]')) {
+                outputTableBody.innerHTML = '';
+            }
+
+            linesToRender.forEach((rawLine) => {
+                if (rawLine === '') return;
+
+                const cleanLine = stripAnsiCodes(rawLine);
+                const parsed = parseTimestampedMessage(cleanLine);
+                const displayMessage = parsed.message || cleanLine;
+                const displayMessageHtml = formatAnsiToHtml(displayMessage);
+                addOutputRow(parsed.time, type, displayMessage, {
+                    messageHtml: displayMessageHtml,
+                    prepend,
+                });
+            });
+
+            if (autoScroll) {
+                outputContainer.scrollTop = outputContainer.scrollHeight;
+            }
+        }
+
+        function clearLogs() {
+            outputTableBody.innerHTML = '';
+            updateOutputCount();
+        }
+
+        function parseTimestampedMessage(line) {
+            const match = String(line).match(/^\[([^\]]+)\]\s*(.*)$/);
+            if (match) {
+                return { time: match[1], message: match[2] };
+            }
+
+            return {
+                time: new Date().toLocaleTimeString(),
+                message: String(line)
+            };
+        }
+
+        function getTypeBadge(type) {
+            const byType = {
+                success: 'bg-green-100 text-green-800',
+                error: 'bg-red-100 text-red-800',
+                warning: 'bg-yellow-100 text-yellow-800',
+                info: 'bg-blue-100 text-blue-800',
+                log: 'bg-gray-100 text-gray-800'
+            };
+            return byType[type] || byType.log;
+        }
+
+        function addOutputRow(time, type, message, options = {}) {
+            const messageHtml = options.messageHtml || escapeHtml(String(message));
+            const prepend = options.prepend === true;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td class="px-4 py-2 align-top text-xs text-gray-500 whitespace-nowrap">${escapeHtml(time)}</td>
+                <td class="px-4 py-2 align-top">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTypeBadge(type)}">${escapeHtml(type.toUpperCase())}</span>
+                </td>
+                <td class="px-4 py-2 align-top text-sm text-gray-900 whitespace-pre-wrap break-words font-mono">${messageHtml}</td>
+            `;
+
+            if (prepend) {
+                outputTableBody.insertBefore(row, outputTableBody.firstChild);
+            } else {
+                outputTableBody.appendChild(row);
+            }
+
+            while (outputTableBody.rows.length > MAX_OUTPUT_ROWS) {
+                if (prepend) {
+                    outputTableBody.removeChild(outputTableBody.lastChild);
+                } else {
+                    outputTableBody.removeChild(outputTableBody.firstChild);
+                }
+            }
+
+            updateOutputCount();
+        }
+
+        function addPlaceholderRow(message) {
+            outputTableBody.innerHTML = '';
+            const row = document.createElement('tr');
+            row.setAttribute('data-placeholder', 'true');
+            row.innerHTML = `<td colspan="3" class="px-4 py-6 text-sm text-gray-500 italic">${escapeHtml(message)}</td>`;
+            outputTableBody.appendChild(row);
+            updateOutputCount();
+        }
+
+        function updateOutputCount() {
+            const isPlaceholder = !!outputTableBody.querySelector('[data-placeholder="true"]');
+            if (isPlaceholder) {
+                outputCount.textContent = '0 entries';
+                return;
+            }
+
+            const count = outputTableBody.rows.length;
+            outputCount.textContent = `${count} entr${count === 1 ? 'y' : 'ies'}`;
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setLoading(loading) {
+            isLoading = loading;
+            const buttons = [deployBtn, forceDeployBtn, scaleBtn, logsBtn, eventsBtn, tailBtn, deleteBtn].filter(Boolean);
+            buttons.forEach(btn => {
+                btn.disabled = loading;
+                if (loading) {
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            });
+        }
+
+        function showError(message) {
+            loadingScreen.classList.add('hidden');
+            mainContent.classList.add('hidden');
+            errorMessage.textContent = message;
+            errorScreen.classList.remove('hidden');
+        }
+
+        function showActionError(message) {
+            showToast(message, 'error', 7000);
+        }
+
+        function showSuccess(message) {
+            showToast(message, 'success', 5000);
+        }
+
+        function showToast(message, type = 'info', duration = 5000) {
+            if (!toastContainer) {
+                return;
+            }
+
+            const styleMap = {
+                success: {
+                    box: 'bg-green-50 border-green-200 text-green-800',
+                    icon: 'fa-circle-check text-green-600',
+                },
+                error: {
+                    box: 'bg-red-50 border-red-200 text-red-800',
+                    icon: 'fa-circle-exclamation text-red-600',
+                },
+                info: {
+                    box: 'bg-blue-50 border-blue-200 text-blue-800',
+                    icon: 'fa-circle-info text-blue-600',
+                },
+            };
+
+            const selected = styleMap[type] || styleMap.info;
+            const toast = document.createElement('div');
+            toast.className = `pointer-events-auto border rounded-md shadow-lg px-3 py-2 text-sm flex items-start gap-2 transition-opacity duration-200 ${selected.box}`;
+            toast.innerHTML = `
+                <i class="fa-solid ${selected.icon} mt-0.5"></i>
+                <div class="flex-1 break-words">${escapeHtml(String(message || ''))}</div>
+            `;
+
+            toastContainer.prepend(toast);
+
+            const closeToast = () => {
+                if (!toast.parentElement) {
+                    return;
+                }
+                toast.classList.add('opacity-0');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.remove();
+                    }
+                }, 200);
+            };
+
+            setTimeout(closeToast, Math.max(1200, duration));
+        }
+    </script>
+</body>
+
+</html>

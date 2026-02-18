@@ -22,7 +22,7 @@ This CLI uses the AWS CLI key/secretKey to do the requests. Please set that up b
 
 AWS CLI min 1.11.167: https://aws.amazon.com/cli
 
-docker & docker-machine: https://docs.docker.com/engine/installation/
+Docker: https://docs.docker.com/get-docker/
 
 ## IAM Permissions
 
@@ -61,6 +61,41 @@ Required permissions:
 
 Contact your AWS administrator if you need these permissions added to your IAM user or role.
 
+## getting started
+
+Before using ecs-aws, you need to set up your AWS credentials:
+
+1. **Configure AWS CLI Profile**: Use the AWS CLI to set up a profile with your credentials:
+
+   ```bash
+   aws configure --profile your-profile-name
+   ```
+
+   You'll be prompted to enter:
+   - AWS Access Key ID
+   - AWS Secret Access Key
+   - Default region name (e.g., us-west-2)
+   - Default output format (json recommended)
+
+2. **Alternative**: If you want to use the default profile, simply run:
+
+   ```bash
+   aws configure
+   ```
+
+3. **Verify Setup**: Test your AWS configuration:
+
+   ```bash
+   aws sts get-caller-identity --profile your-profile-name
+   ```
+
+4. **Initialize ecs-aws**: Once AWS CLI is configured, initialize ecs-aws in your project directory:
+   ```bash
+   ecs-aws init --profile your-service-config-name
+   ```
+
+**Note**: The profile name you use with AWS CLI should match the profile name you use with ecs-aws commands.
+
 ## usage
 
 ecs-aws allows you to deploy an ECS service without having to modify all the configuration and task definition over and over.
@@ -73,9 +108,24 @@ after initialisation you can:
 
 #### configuration
 
+- `ecs-aws init [--profile profilename]` to initialize a new ECS configuration (From existing service or new one)
 - `ecs-aws configure [--profile profilename]` to change configuration
 - `ecs-aws check [--profile profilename]` to check the configuration
 - `ecs-aws info [--profile profilename]` to view the configuration
+
+#### web interface
+
+- `ecs-aws web [--profile profilename]` to launch a web-based management interface
+  - Opens a browser with an intuitive GUI for service management
+  - Automatically loads the "default" profile if no profile is specified
+  - Use `--profile` or `-p` flag to load a specific profile instead
+  - Features include profile selection, service deployment, log viewing, real-time log tailing, and service deletion
+  - Automatically runs on http://localhost:3000
+  - Perfect for users who prefer visual interfaces over command-line operations
+  - All functionality available in CLI is also accessible through the web interface
+  - Examples:
+    - `ecs-aws web` - Launch and auto-load default profile
+    - `ecs-aws web -p production` - Launch and auto-load production profile
 
 #### deployment
 

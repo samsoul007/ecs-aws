@@ -18,9 +18,12 @@ const {
   getServiceData,
   getLogStreams,
   getLogEvents,
+  getMetricStatistics,
   loadAWSProfile,
   loadAWSProfiles,
   updateService,
+  forceNewDeployment,
+  updateDesiredCount,
   checkTag,
   checkLogGroup,
   checkDockerRepo,
@@ -35,6 +38,8 @@ const {
   createECRRepository,
   createTaskDefinitionForNewService,
   loadLoadBalancers,
+  describeTargetGroupByArn,
+  describeTargetHealthSummary,
   loadListeners,
   createTargetGroup,
   createListenerRule,
@@ -78,6 +83,8 @@ const { argv } = yargs
     type: 'boolean',
   })
   .command('deploy', 'Deploy the code into ECR & ECS (will use the GIT short hash as version if available)')
+  .command('force-deploy', 'Force a new deployment of the ECS service without changing image tag.')
+  .command('scale', 'Change desired number of tasks for the ECS service (interactive prompt).')
   .command('run', 'Run local container.')
   .command('rebuild', 'Rebuild the image container from the Dockerfile.')
   .command('info', 'View a configuration table.')
@@ -88,10 +95,38 @@ const { argv } = yargs
   .command('check', 'Check configuration.')
   .command('configure', 'Change a config file configuration.')
   .command('init', 'Initialise a config file.')
+  .command('web', 'Launch web-based management interface.')
   .command('delete-service', 'Delete an ECS service and all associated resources.')
   .help();
 
 const cwd = process.cwd();
+let sProfile = '';
+let sFileName = '';
+
+const normalizeProfileName = (profileName = '') => {
+  if (!profileName || profileName === 'default') {
+    return '';
+  }
+
+  return String(profileName).replace(/^_+/, '');
+};
+
+const getConfigFileNameForProfile = (profileName = '') => {
+  const normalizedProfile = normalizeProfileName(profileName);
+  return `ECSConfig${normalizedProfile ? `_${normalizedProfile}` : ''}.json`;
+};
+
+const emitProgress = (options = {}, message) => {
+  if (!options || typeof options.onProgress !== 'function') {
+    return;
+  }
+
+  try {
+    options.onProgress(message);
+  } catch (error) {
+    // Ignore callback errors in progress reporting
+  }
+};
 
 const log = (sText) => {
   console.log(emoji.emojify(sText));
@@ -229,56 +264,68 @@ const commit = () => {
       }));
 };
 
-const rebuildNPM = oProfile => inquirer.prompt([{
-  type: 'confirm',
-  name: 'rebuild',
-  message: 'Do you want to rebuild the NPM modules?',
-  default: false,
-}])
-  .then((answers) => {
-    if (!answers.rebuild) {
-      return Promise.resolve(true);
-    }
-    const spinner = new Spinner('Installing NPM modules. Please wait...', ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
-    spinner.start();
+const rebuildNPM = (oProfile, options = {}) => {
+  if (options.skipNpmRebuild || options.nonInteractive) {
+    emitProgress(options, 'Skipping npm rebuild');
+    return Promise.resolve(true);
+  }
 
-    const sImage = (`${oProfile.profile}/${oProfile.task}/${oProfile.dockerfile}:ecs-aws`).toLowerCase();
-
-    return exec('rm -rf node_modules;')
-      .then(() => spawnP(`docker run  -a stdout --rm -v ${process.cwd()}:/app -w /app '${sImage}' npm install`))
-      .then(() => {
-        spinner.stop();
-        log(':+1: NPM modules finished installing.');
+  return inquirer.prompt([{
+    type: 'confirm',
+    name: 'rebuild',
+    message: 'Do you want to rebuild the NPM modules?',
+    default: false,
+  }])
+    .then((answers) => {
+      if (!answers.rebuild) {
         return Promise.resolve(true);
-      });
-  });
+      }
+      const spinner = new Spinner('Installing NPM modules. Please wait...', ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
+      spinner.start();
+      emitProgress(options, 'Installing npm modules');
+
+      const sImage = (`${oProfile.profile}/${oProfile.task}/${oProfile.dockerfile}:ecs-aws`).toLowerCase();
+
+      return exec('rm -rf node_modules;')
+        .then(() => spawnP(`docker run  -a stdout --rm -v ${process.cwd()}:/app -w /app '${sImage}' npm install`))
+        .then(() => {
+          spinner.stop();
+          log(':+1: NPM modules finished installing.');
+          return Promise.resolve(true);
+        });
+    });
+};
 
 // const getAWSAccountID = () => {
 //   const sts = new AWS.STS();
 //   return sts.getCallerIdentity({}).promise().then(data => data.Account);
 // };
 
-const buildImage = (arroProfileData, tag) => {
+const buildImage = (arroProfileData, tag, options = {}) => {
   const sImage = `${arroProfileData.repo}:${tag}`;
   const sRepoName = arroProfileData.repo.split('amazonaws.com/')[1];
   const spinner = new Spinner('Connecting to ECR', ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
 
   spinner.start();
+  emitProgress(options, 'Connecting to ECR');
 
   return exec(`aws ecr get-login --no-include-email ${arroProfileData.profile ? ` --profile ${arroProfileData.profile}` : ''}`)
     .then((result) => {
       const sResult = result.stdout.replace('-e none', '');
       return exec(sResult);
     }).then(() => {
+      emitProgress(options, `Building Docker image with tag ${tag}`);
       spinner.message(`Building image '${tag}' from docker file '${arroProfileData.dockerfile}'`, ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
       // console.log(`docker build --platform linux/amd64 -f ${arroProfileData.dockerfile} -t ${sRepoName} .`);
       return exec(`docker build --platform linux/amd64 -f ${arroProfileData.dockerfile} -t ${sRepoName} .`);
     }).then(() => {
+      emitProgress(options, `Tagging image ${tag}`);
       spinner.message(`Tagging image '${tag}' from docker file '${arroProfileData.dockerfile}'`);
 
       return exec(`docker tag ${sRepoName} ${sImage}`);
     })
     .then(() => {
+      emitProgress(options, `Pushing image ${tag}`);
       spinner.message(`Pushing image '${tag}' from docker file '${arroProfileData.dockerfile}'`);
 
       return exec(`docker push ${sImage}`);
@@ -290,37 +337,63 @@ const buildImage = (arroProfileData, tag) => {
     .then(() => {
       spinner.stop();
       log(':+1: Docker image pushed successfully.');
+      emitProgress(options, 'Docker image pushed successfully');
     });
 };
 
-const getImageTag = (arroProfileData, manual) => (manual ? Promise.resolve(false) : exec('git rev-parse --short HEAD').catch(() => Promise.resolve(false))).then(result => result.stdout).then((result) => {
-  if (result) {
-    return result.trim();
-  }
-
-  return inquirer.prompt([{
-    type: 'input',
-    name: 'tag',
-    message: 'Enter tag:',
-    // [a-zA-Z0-9-_.]+
-    validate(value) {
-      const pass = value.match(/^([a-zA-Z0-9-_.]+)$/i);
-      if (pass) {
-        return true;
-      }
-
-      return 'Invalid value, must validate "[a-zA-Z0-9-_.]+"';
-    },
-  }]).then(answers => answers.tag);
-}).then((tag) => {
-  return checkTag(arroProfileData, tag).then((result) => {
-    if (result.exists) {
-      log(`Image tag ${tag} already exists, please enter another:`);
-      return getImageTag(arroProfileData, true);
+const getImageTag = (arroProfileData, manual, options = {}) => {
+  const resolveTag = () => {
+    if (options.tagOverride) {
+      return Promise.resolve(options.tagOverride);
     }
-    return tag;
+
+    return (manual ? Promise.resolve(false) : exec('git rev-parse --short HEAD').catch(() => Promise.resolve(false)))
+      .then(result => (result && result.stdout ? result.stdout.trim() : false))
+      .then((result) => {
+        if (result) {
+          return result;
+        }
+
+        if (options.nonInteractive) {
+          const err = new Error('No deployment tag available. Provide a tag and retry.');
+          err.code = 'TAG_REQUIRED';
+          throw err;
+        }
+
+        return inquirer.prompt([{
+          type: 'input',
+          name: 'tag',
+          message: 'Enter tag:',
+          validate(value) {
+            const pass = value.match(/^([a-zA-Z0-9-_.]+)$/i);
+            if (pass) {
+              return true;
+            }
+
+            return 'Invalid value, must validate "[a-zA-Z0-9-_.]+"';
+          },
+        }]).then(answers => answers.tag);
+      });
+  };
+
+  return resolveTag().then((tag) => {
+    emitProgress(options, `Using deployment tag ${tag}`);
+    return checkTag(arroProfileData, tag).then((result) => {
+      if (result.exists) {
+        if (options.nonInteractive) {
+          const err = new Error(`Image tag ${tag} already exists. Provide a new tag and retry.`);
+          err.code = 'TAG_EXISTS';
+          err.tag = tag;
+          throw err;
+        }
+
+        log(`Image tag ${tag} already exists, please enter another:`);
+        return getImageTag(arroProfileData, true, options);
+      }
+      return tag;
+    });
   });
-});
+};
 
 const addEnvVariables = (arroProfileData) => {
   const envVariables = arroProfileData.env || [];
@@ -369,39 +442,132 @@ const addEnvVariables = (arroProfileData) => {
   }));
 };
 
-const deploy = (arroProfileData) => {
+const deploy = (arroProfileData, options = {}) => {
   log(':rocket: Starting deployement');
+  emitProgress(options, 'Starting deployment');
   let sTag = false;
 
   return fileExists(`${cwd}/${arroProfileData.dockerfile}`)
     .catch(() => Promise.reject(new Error(`${arroProfileData.dockerfile} not found, please create it. Exiting.`)))
-    .then(() => getImageTag(arroProfileData))
+    .then(() => getImageTag(arroProfileData, false, options))
     .then((tag) => {
       sTag = tag;
+      emitProgress(options, 'Checking CloudWatch log group');
       return checkLogGroup(arroProfileData);
     })
     .then((result) => {
       if (result.created) {
         log(':cyclone: AWS log group not existant. Creating...');
         log(`:+1: AWS log group ${arroProfileData.log} successfully created`);
+        emitProgress(options, `Created log group ${arroProfileData.log}`);
       } else {
         log('AWS log group already created.');
+        emitProgress(options, 'Log group already exists');
       }
-      return rebuildNPM(arroProfileData);
+      return rebuildNPM(arroProfileData, options);
     })
-    .then(() => buildImage(arroProfileData, sTag))
+    .then(() => buildImage(arroProfileData, sTag, options))
     .then(() => {
       if (!arroProfileData.task) {
         log(':cyclone: No task definition to update');
+        emitProgress(options, 'No task definition update required');
         return Promise.resolve(true);
       }
       log(`:cyclone: Updating task definition ${arroProfileData.task}`);
+      emitProgress(options, `Updating task definition ${arroProfileData.task}`);
       return updateService(arroProfileData, sTag, arroProfileData.region);
     })
     .then(() => {
       log(':white_check_mark: Successfully deployed.');
+      emitProgress(options, 'Deployment completed successfully');
       return true;
     });
+};
+
+const forceDeploymentCommand = (arroProfileData, options = {}) => {
+  if (!arroProfileData.service) {
+    return Promise.reject(new Error('Force deployment is only available for ECS services (not scheduled tasks).'));
+  }
+
+  const confirmAction = () => {
+    if (options.nonInteractive) {
+      return Promise.resolve(true);
+    }
+
+    return inquirer.prompt([{
+      type: 'confirm',
+      name: 'confirmed',
+      message: 'Force a new deployment of this service?',
+      default: false,
+    }]).then(answers => answers.confirmed);
+  };
+
+  return confirmAction().then((confirmed) => {
+    if (!confirmed) {
+      log(':warning: Force deployment cancelled.');
+      emitProgress(options, 'Force deployment cancelled');
+      return false;
+    }
+
+    log(':recycle: Forcing new deployment...');
+    emitProgress(options, 'Forcing new deployment');
+
+    return forceNewDeployment(arroProfileData)
+      .then(() => {
+        log(':white_check_mark: New deployment triggered successfully.');
+        emitProgress(options, 'New deployment triggered successfully');
+        return true;
+      });
+  });
+};
+
+const scaleServiceCommand = (arroProfileData, desiredCount, options = {}) => {
+  if (!arroProfileData.service) {
+    return Promise.reject(new Error('Scaling is only available for ECS services (not scheduled tasks).'));
+  }
+
+  const resolveDesiredCount = () => {
+    if (desiredCount !== undefined && desiredCount !== null && desiredCount !== '') {
+      return Promise.resolve(desiredCount);
+    }
+
+    if (options.nonInteractive) {
+      const err = new Error('Desired task count is required in non-interactive mode.');
+      err.code = 'DESIRED_COUNT_REQUIRED';
+      return Promise.reject(err);
+    }
+
+    return inquirer.prompt([{
+      type: 'input',
+      name: 'desiredCount',
+      message: 'Enter desired task count (non-negative integer):',
+      default: '1',
+      validate(value) {
+        const normalized = Number(value);
+        if (Number.isInteger(normalized) && normalized >= 0) {
+          return true;
+        }
+        return 'Please enter a non-negative integer.';
+      },
+    }]).then(answers => answers.desiredCount);
+  };
+
+  return resolveDesiredCount().then((resolvedCount) => {
+    const scaleTo = Number(resolvedCount);
+    if (!Number.isInteger(scaleTo) || scaleTo < 0) {
+      return Promise.reject(new Error('Desired task count must be a non-negative integer.'));
+    }
+
+    log(`:bar_chart: Updating desired task count to ${scaleTo}...`);
+    emitProgress(options, `Updating desired task count to ${scaleTo}`);
+
+    return updateDesiredCount(arroProfileData, scaleTo)
+      .then(() => {
+        log(`:white_check_mark: Desired task count updated to ${scaleTo}.`);
+        emitProgress(options, `Desired task count updated to ${scaleTo}`);
+        return true;
+      });
+  });
 };
 
 const events = (arroProfileData) => {
@@ -520,10 +686,39 @@ const tail = (arroProfileData) => {
 
   let lastTimestamp = Date.now();
   let isFirstFetch = true;
+  let interval = null;
+  let stopped = false;
+
+  const stopTailing = () => {
+    if (stopped) {
+      return;
+    }
+
+    stopped = true;
+
+    if (interval) {
+      clearInterval(interval);
+      interval = null;
+    }
+
+    log('\n:wave: Stopped tailing logs');
+    process.exit(0);
+  };
+
+  process.once('SIGINT', stopTailing);
+  process.once('SIGTERM', stopTailing);
 
   const fetchAndDisplayLogs = () => {
+    if (stopped) {
+      return Promise.resolve();
+    }
+
     return getLogStreams(arroProfileData.log)
       .then((arrsStreams) => {
+        if (stopped) {
+          return [];
+        }
+
         if (!arrsStreams || arrsStreams.length === 0) {
           return [];
         }
@@ -542,6 +737,10 @@ const tail = (arroProfileData) => {
         return Promise.all(arroPromises);
       })
       .then((arroData) => {
+        if (stopped) {
+          return;
+        }
+
         const logs = [];
 
         for (let i = 0; i < arroData.length; i += 1) {
@@ -585,7 +784,7 @@ const tail = (arroProfileData) => {
         isFirstFetch = false;
       })
       .catch((error) => {
-        if (!isFirstFetch) {
+        if (!isFirstFetch && !stopped) {
           console.error(colors.red(`Error fetching logs: ${error.message}`));
         }
       });
@@ -593,17 +792,14 @@ const tail = (arroProfileData) => {
 
   // Initial fetch
   fetchAndDisplayLogs().then(() => {
+    if (stopped) {
+      return;
+    }
+
     // Continue fetching every 2 seconds
-    const interval = setInterval(() => {
+    interval = setInterval(() => {
       fetchAndDisplayLogs();
     }, 2000);
-
-    // Handle Ctrl+C gracefully
-    process.on('SIGINT', () => {
-      clearInterval(interval);
-      log('\n:wave: Stopped tailing logs');
-      process.exit(0);
-    });
   });
 };
 
@@ -787,7 +983,662 @@ const view = (arroProfileData) => {
     }
   });
 
-  return console.log(table.toString());
+  console.log(table.toString());
+};
+
+// Export functions for web manager
+module.exports = {
+  // Get list of available ECS config profiles
+  getProfiles: () => {
+    const configFiles = listECSConfigFiles();
+    return configFiles.map(file => {
+      // Remove ECSConfig prefix and .json suffix to get profile name
+      const match = file.match(/^ECSConfig(.*)\.json$/);
+      return match ? match[1] || 'default' : file;
+    });
+  },
+
+  // Check configuration profile and return config data
+  checkConfigurationProfile: async (profileName) => {
+    const configFileName = getConfigFileNameForProfile(profileName);
+
+    try {
+      const config = await loadConfigFile(configFileName);
+      return config;
+    } catch (error) {
+      throw new Error(`Failed to load profile ${profileName}: ${error.message}`);
+    }
+  },
+
+  // Get service information
+  getServiceInfo: async (profileName) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+
+      const config = await loadConfigFile(configFileName);
+
+      const hasService = typeof config.service === 'string' && config.service.trim().length > 0;
+
+      if (!hasService) {
+        return {
+          serviceName: config.service_name || 'Not deployed',
+          status: 'Not deployed',
+          taskDefinition: 'N/A',
+          runningCount: 0,
+          desiredCount: 0,
+          platformVersion: 'N/A',
+          createdAt: null,
+          config,
+        };
+      }
+
+      // Load AWS profile first
+      await loadAWSProfile(config);
+
+      // Get service details from AWS
+      const serviceInfo = await checkService(config.cluster, config.service);
+
+      const service = serviceInfo?.services?.[0];
+
+      return {
+        serviceName: config.service_name || config.service,
+        status: service?.status || 'Unknown',
+        taskDefinition: service?.taskDefinition || 'N/A',
+        runningCount: service?.runningCount || 0,
+        desiredCount: service?.desiredCount || 0,
+        platformVersion: service?.platformVersion || 'N/A',
+        createdAt: service?.createdAt || null,
+        config: config
+      };
+    } catch (error) {
+      throw new Error(`Failed to get service info: ${error.message}`);
+    }
+  },
+
+  // Deploy service
+  deployService: async (profileName, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+
+      const config = await loadConfigFile(configFileName);
+      const result = await deploy(config, options);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to deploy service: ${error.message}`);
+    }
+  },
+
+  // Force a new deployment
+  forceDeployService: async (profileName, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const config = await loadConfigFile(configFileName);
+
+      await loadAWSProfile(config);
+      return forceDeploymentCommand(config, options);
+    } catch (error) {
+      throw new Error(`Failed to force deployment: ${error.message}`);
+    }
+  },
+
+  // Scale desired task count
+  scaleService: async (profileName, desiredCount, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const config = await loadConfigFile(configFileName);
+
+      await loadAWSProfile(config);
+      return scaleServiceCommand(config, desiredCount, options);
+    } catch (error) {
+      throw new Error(`Failed to scale service: ${error.message}`);
+    }
+  },
+
+  // Get service logs
+  getServiceLogs: async (profileName, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+      const limit = Math.min(500, Math.max(1, parseInt(options.limit, 10) || 100));
+
+      const config = await loadConfigFile(configFileName);
+
+      // Load AWS profile first
+      await loadAWSProfile(config);
+
+      // Get log streams for the service
+      const logStreams = (await getLogStreams(config.log))
+        .filter(logStreamName => typeof logStreamName === 'string' && logStreamName.length > 0);
+
+      if (!logStreams || logStreams.length === 0) {
+        return {
+          items: [],
+          total: 0,
+          offset,
+          limit,
+          hasMore: false,
+        };
+      }
+
+      // Get logs from the most recent stream
+      const recentStreamName = logStreams[0];
+      const logEvents = await getLogEvents(config.log, recentStreamName);
+
+      // Convert log events to string array
+      const logs = [];
+      Object.keys(logEvents).forEach(timestamp => {
+        const numericTimestamp = parseInt(timestamp, 10);
+        logEvents[timestamp].forEach(message => {
+          const date = new Date(numericTimestamp).toISOString();
+          logs.push({
+            timestamp: numericTimestamp,
+            line: `[${date}] ${message}`,
+          });
+        });
+      });
+
+      logs.sort((a, b) => b.timestamp - a.timestamp);
+
+      const paged = logs.slice(offset, offset + limit).map(entry => entry.line);
+
+      return {
+        items: paged,
+        total: logs.length,
+        offset,
+        limit,
+        hasMore: offset + paged.length < logs.length,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get logs: ${error.message}`);
+    }
+  },
+
+  // Get service events
+  getServiceEvents: async (profileName, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const offset = Math.max(0, parseInt(options.offset, 10) || 0);
+      const limit = Math.min(500, Math.max(1, parseInt(options.limit, 10) || 100));
+
+      const config = await loadConfigFile(configFileName);
+
+      // Load AWS profile first
+      await loadAWSProfile(config);
+
+      // Get service data which includes events
+      const serviceData = await getServiceData(config);
+      const events = serviceData?.services?.[0]?.events || [];
+
+      if (!events.length) {
+        return {
+          items: [],
+          total: 0,
+          offset,
+          limit,
+          hasMore: false,
+        };
+      }
+
+      const entries = events
+        .map((event) => {
+          const createdAtValue = event.createdAt ? new Date(event.createdAt).getTime() : 0;
+          const safeTimestamp = Number.isFinite(createdAtValue) ? createdAtValue : 0;
+          const isoTimestamp = safeTimestamp > 0 ? new Date(safeTimestamp).toISOString() : 'N/A';
+
+          return {
+            timestamp: safeTimestamp,
+            line: `[${isoTimestamp}] ${event.message}`,
+          };
+        })
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+      const paged = entries.slice(offset, offset + limit).map(entry => entry.line);
+
+      return {
+        items: paged,
+        total: entries.length,
+        offset,
+        limit,
+        hasMore: offset + paged.length < entries.length,
+      };
+    } catch (error) {
+      throw new Error(`Failed to get events: ${error.message}`);
+    }
+  },
+
+  // Get dashboard data for web manager (service info + resources + events + metrics)
+  getServiceDashboard: async (profileName) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const config = await loadConfigFile(configFileName);
+
+      await loadAWSProfile(config);
+
+      const resourceDetails = [];
+      if (config.cluster) resourceDetails.push({ label: 'Cluster ARN', value: config.cluster });
+      if (config.repo) resourceDetails.push({ label: 'ECR Repository', value: config.repo });
+      if (config.log) resourceDetails.push({ label: 'Log Group', value: config.log });
+      if (config.region) resourceDetails.push({ label: 'Region', value: config.region });
+      const configuredDns = config.dns || config.new_service?.hostname || config.hostname;
+      if (configuredDns) resourceDetails.push({ label: 'DNS', value: configuredDns });
+      if (config.hostname) resourceDetails.push({ label: 'Hostname', value: config.hostname });
+      if (config.loadBalancerDNSName) resourceDetails.push({ label: 'Load Balancer DNS', value: config.loadBalancerDNSName });
+
+      // Scheduled task / cronjob profile
+      if (!config.service) {
+        return {
+          type: 'scheduled-task',
+          serviceSummary: {
+            serviceName: config.task,
+            status: 'Scheduled Task',
+            taskDefinition: config.task,
+            runningCount: 0,
+            desiredCount: 0,
+          },
+          resourceDetails,
+          events: [{
+            timestamp: null,
+            message: 'Service events are not available for scheduled tasks. Check EventBridge for schedule status.',
+            level: 'info'
+          }],
+          metrics: {
+            cpu: [],
+            memory: []
+          }
+        };
+      }
+
+      const serviceData = await getServiceData(config);
+      const service = serviceData?.services?.[0];
+      const serviceEvents = service?.events || [];
+
+      const parseTargetGroupDimension = (targetGroupArn = '') => {
+        const match = String(targetGroupArn).match(/targetgroup\/.+$/);
+        return match ? match[0] : '';
+      };
+
+      const parseLoadBalancerDimension = (loadBalancerArn = '') => {
+        const match = String(loadBalancerArn).match(/(?:app|net)\/.+$/);
+        return match ? match[0] : '';
+      };
+
+      const calculatePercentile = (values = [], percentile = 95) => {
+        const numeric = values
+          .map(v => Number(v))
+          .filter(v => Number.isFinite(v))
+          .sort((a, b) => a - b);
+
+        if (!numeric.length) {
+          return null;
+        }
+
+        const index = Math.min(numeric.length - 1, Math.max(0, Math.ceil((percentile / 100) * numeric.length) - 1));
+        return numeric[index];
+      };
+
+      if (service?.serviceArn) {
+        resourceDetails.unshift({ label: 'Service ARN', value: service.serviceArn });
+      }
+      if (service?.taskDefinition) {
+        resourceDetails.unshift({ label: 'Task Def ARN', value: service.taskDefinition });
+      }
+      if (service?.loadBalancers?.length && service.loadBalancers[0].targetGroupArn) {
+        resourceDetails.push({ label: 'Target Group ARN', value: service.loadBalancers[0].targetGroupArn });
+      }
+
+      const parseClusterName = (clusterValue) => {
+        if (!clusterValue) return '';
+        if (clusterValue.includes('cluster/')) {
+          return clusterValue.split('cluster/')[1];
+        }
+        const parts = clusterValue.split('/');
+        return parts[parts.length - 1] || '';
+      };
+
+      const parseServiceName = (serviceValue) => {
+        if (!serviceValue) return '';
+        if (serviceValue.includes('service/')) {
+          const servicePart = serviceValue.split('service/')[1];
+          const parts = servicePart.split('/');
+          return parts[parts.length - 1] || '';
+        }
+        const parts = serviceValue.split('/');
+        return parts[parts.length - 1] || serviceValue;
+      };
+
+      const clusterName = parseClusterName(service?.clusterArn || config.cluster);
+      const serviceName = (service && service.serviceName)
+        ? service.serviceName
+        : parseServiceName(config.service || service?.serviceArn);
+
+      if (!clusterName || !serviceName) {
+        return {
+          type: 'service',
+          serviceSummary: {
+            serviceName: service?.serviceName || config.service_name || config.service,
+            status: service?.status || 'Unknown',
+            taskDefinition: service?.taskDefinition || 'N/A',
+            runningCount: service?.runningCount || 0,
+            desiredCount: service?.desiredCount || 0,
+            pendingCount: service?.pendingCount || 0,
+            createdAt: service?.createdAt || null,
+            deployedAt: service?.deployments?.[0]?.updatedAt || null,
+          },
+          resourceDetails,
+          events: serviceEvents.slice(0, 30).map(event => ({
+            timestamp: event.createdAt ? new Date(event.createdAt).toISOString() : null,
+            message: event.message || '',
+            level: 'info'
+          })),
+          metrics: {
+            cpu: [],
+            memory: []
+          },
+          advancedMetrics: {
+            restartCount: 0,
+            deployment: {
+              rolloutState: 'UNKNOWN',
+              progressPercent: 0,
+              runningCount: 0,
+              desiredCount: 0,
+              pendingCount: 0,
+            },
+            alb: {
+              requestCount: 0,
+              target5xxCount: 0,
+              targetResponseTimeP95Ms: null,
+            },
+            targetHealth: {
+              healthy: 0,
+              unhealthy: 0,
+              initial: 0,
+              draining: 0,
+              unused: 0,
+              unavailable: 0,
+              unknown: 0,
+              reasons: [],
+            },
+            runtimeSignals: {
+              oomEvents: 0,
+              exitSignals: [],
+            },
+            runningDesiredTrend: [],
+          },
+        };
+      }
+
+      const makeMetricParams = metricName => ({
+        EndTime: new Date(),
+        MetricName: metricName,
+        Namespace: 'AWS/ECS',
+        Period: 60,
+        StartTime: new Date(Date.now() - (20 * 60 * 1000)),
+        Dimensions: [{
+          Name: 'ClusterName',
+          Value: clusterName,
+        }, {
+          Name: 'ServiceName',
+          Value: serviceName,
+        }],
+        Statistics: ['Average', 'Minimum', 'Maximum'],
+        Unit: 'Percent',
+      });
+
+      const [cpuStats, memoryStats] = await Promise.all([
+        getMetricStatistics(makeMetricParams('CPUUtilization')).catch(() => []),
+        getMetricStatistics(makeMetricParams('MemoryUtilization')).catch(() => []),
+      ]);
+
+      const targetGroupArn = service?.loadBalancers?.[0]?.targetGroupArn || '';
+      const targetGroupDimension = parseTargetGroupDimension(targetGroupArn);
+      const configuredLoadBalancerArn = config?.new_service?.loadBalancerArn || '';
+
+      const targetGroupDetails = targetGroupArn
+        ? await describeTargetGroupByArn(targetGroupArn).catch(() => null)
+        : null;
+
+      const loadBalancerArn = (targetGroupDetails?.LoadBalancerArns || [])[0] || configuredLoadBalancerArn;
+      const loadBalancerDimension = parseLoadBalancerDimension(loadBalancerArn);
+
+      const makeAlbMetricParams = (metricName, options = {}) => {
+        const params = {
+          EndTime: new Date(),
+          MetricName: metricName,
+          Namespace: 'AWS/ApplicationELB',
+          Period: options.period || 60,
+          StartTime: new Date(Date.now() - ((options.windowMinutes || 20) * 60 * 1000)),
+          Dimensions: [],
+          Statistics: options.statistics || ['Sum'],
+        };
+
+        if (options.unit) {
+          params.Unit = options.unit;
+        }
+
+        if (targetGroupDimension) {
+          params.Dimensions.push({ Name: 'TargetGroup', Value: targetGroupDimension });
+        }
+
+        if (loadBalancerDimension) {
+          params.Dimensions.push({ Name: 'LoadBalancer', Value: loadBalancerDimension });
+        }
+
+        return params;
+      };
+
+      const makeTaskCountParams = (metricName) => ({
+        EndTime: new Date(),
+        MetricName: metricName,
+        Namespace: 'AWS/ECS',
+        Period: 60,
+        StartTime: new Date(Date.now() - (20 * 60 * 1000)),
+        Dimensions: [{
+          Name: 'ClusterName',
+          Value: clusterName,
+        }, {
+          Name: 'ServiceName',
+          Value: serviceName,
+        }],
+        Statistics: ['Average'],
+        Unit: 'Count',
+      });
+
+      const [requestCountStats, target5xxStats, targetResponseStats, targetHealthSummary, runningTaskStats, desiredTaskStats] = await Promise.all([
+        (targetGroupDimension && loadBalancerDimension)
+          ? getMetricStatistics(makeAlbMetricParams('RequestCount', { statistics: ['Sum'], unit: 'Count' })).catch(() => [])
+          : Promise.resolve([]),
+        (targetGroupDimension && loadBalancerDimension)
+          ? getMetricStatistics(makeAlbMetricParams('HTTPCode_Target_5XX_Count', { statistics: ['Sum'], unit: 'Count' })).catch(() => [])
+          : Promise.resolve([]),
+        (targetGroupDimension && loadBalancerDimension)
+          ? getMetricStatistics(makeAlbMetricParams('TargetResponseTime', { statistics: ['Average'], unit: 'Seconds' })).catch(() => [])
+          : Promise.resolve([]),
+        targetGroupArn ? describeTargetHealthSummary(targetGroupArn).catch(() => ({
+          healthy: 0,
+          unhealthy: 0,
+          initial: 0,
+          draining: 0,
+          unused: 0,
+          unavailable: 0,
+          unknown: 0,
+          reasons: [],
+        })) : Promise.resolve({
+          healthy: 0,
+          unhealthy: 0,
+          initial: 0,
+          draining: 0,
+          unused: 0,
+          unavailable: 0,
+          unknown: 0,
+          reasons: [],
+        }),
+        getMetricStatistics(makeTaskCountParams('RunningTaskCount')).catch(() => []),
+        getMetricStatistics(makeTaskCountParams('DesiredTaskCount')).catch(() => []),
+      ]);
+
+      const mapMetrics = stats => (stats || [])
+        .map(item => ({
+          timestamp: item.Timestamp ? new Date(item.Timestamp).toISOString() : null,
+          average: Number(item.Average ?? item.average),
+          minimum: Number(item.Minimum ?? item.minimum),
+          maximum: Number(item.Maximum ?? item.maximum),
+        }))
+        .filter(point => (
+          point.timestamp
+          && Number.isFinite(point.average)
+          && Number.isFinite(point.minimum)
+          && Number.isFinite(point.maximum)
+        ))
+        .sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+
+      const mappedEvents = serviceEvents.slice(0, 30).map(event => {
+        const message = event.message || '';
+        let level = 'info';
+        if (/failed|error|unable/i.test(message)) {
+          level = 'error';
+        } else if (/steady state|success|successful/i.test(message)) {
+          level = 'success';
+        } else if (/warn|warning/i.test(message)) {
+          level = 'warning';
+        }
+
+        return {
+          timestamp: event.createdAt ? new Date(event.createdAt).toISOString() : null,
+          message,
+          level,
+        };
+      });
+
+      const restartCount = serviceEvents
+        .filter(event => /has started|started task|task started|replacement|restart/i.test(event?.message || ''))
+        .length;
+
+      const oomEvents = serviceEvents
+        .filter(event => /oom|outofmemory|out of memory/i.test(event?.message || ''))
+        .length;
+
+      const exitSignals = serviceEvents
+        .map(event => event?.message || '')
+        .filter(message => /exit|stopped reason|essential container/i.test(message))
+        .slice(0, 10);
+
+      const primaryDeployment = (service?.deployments || [])
+        .find(item => item.status === 'PRIMARY') || (service?.deployments || [])[0];
+
+      const deploymentRunning = Number(primaryDeployment?.runningCount ?? service?.runningCount ?? 0);
+      const deploymentDesired = Number(primaryDeployment?.desiredCount ?? service?.desiredCount ?? 0);
+      const deploymentPending = Number(primaryDeployment?.pendingCount ?? service?.pendingCount ?? 0);
+      const deploymentProgress = deploymentDesired > 0
+        ? Math.min(100, Math.round((deploymentRunning / deploymentDesired) * 100))
+        : 0;
+
+      const requestCount = (requestCountStats || []).reduce((sum, item) => sum + Number(item.Sum || 0), 0);
+      const target5xxCount = (target5xxStats || []).reduce((sum, item) => sum + Number(item.Sum || 0), 0);
+      const responseTimeP95Seconds = calculatePercentile((targetResponseStats || []).map(item => item.Average), 95);
+
+      const runningMap = new Map((runningTaskStats || [])
+        .filter(item => item.Timestamp)
+        .map(item => [new Date(item.Timestamp).toISOString(), Number(item.Average || 0)]));
+
+      const desiredMap = new Map((desiredTaskStats || [])
+        .filter(item => item.Timestamp)
+        .map(item => [new Date(item.Timestamp).toISOString(), Number(item.Average || 0)]));
+
+      const trendTimestamps = Array.from(new Set([...runningMap.keys(), ...desiredMap.keys()])).sort();
+      const runningDesiredTrend = trendTimestamps.map(timestamp => ({
+        timestamp,
+        running: runningMap.has(timestamp) ? runningMap.get(timestamp) : null,
+        desired: desiredMap.has(timestamp) ? desiredMap.get(timestamp) : null,
+      }));
+
+      return {
+        type: 'service',
+        serviceSummary: {
+          serviceName: service?.serviceName || config.service_name || config.service,
+          status: service?.status || 'Unknown',
+          taskDefinition: service?.taskDefinition || 'N/A',
+          runningCount: service?.runningCount || 0,
+          desiredCount: service?.desiredCount || 0,
+          pendingCount: service?.pendingCount || 0,
+          createdAt: service?.createdAt || null,
+          deployedAt: service?.deployments?.[0]?.updatedAt || null,
+        },
+        resourceDetails,
+        events: mappedEvents,
+        metrics: {
+          cpu: mapMetrics(cpuStats),
+          memory: mapMetrics(memoryStats),
+        },
+        advancedMetrics: {
+          restartCount,
+          deployment: {
+            rolloutState: primaryDeployment?.rolloutState || 'UNKNOWN',
+            progressPercent: deploymentProgress,
+            runningCount: deploymentRunning,
+            desiredCount: deploymentDesired,
+            pendingCount: deploymentPending,
+          },
+          alb: {
+            requestCount,
+            target5xxCount,
+            targetResponseTimeP95Ms: responseTimeP95Seconds === null ? null : Math.round(responseTimeP95Seconds * 1000),
+          },
+          targetHealth: targetHealthSummary,
+          runtimeSignals: {
+            oomEvents,
+            exitSignals,
+          },
+          runningDesiredTrend,
+        },
+      };
+    } catch (error) {
+      throw new Error(`Failed to get dashboard data: ${error.message}`);
+    }
+  },
+
+  // Delete service permissions for web manager
+  deleteServicePermission: async (profileName) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+      const config = await loadConfigFile(configFileName);
+
+      await loadAWSProfile(config);
+      const permission = await checkDeletePermissions();
+
+      const serviceName = config.service
+        ? (config.service.split('service/')[1]?.split('/').pop() || config.service)
+        : config.task;
+
+      return {
+        allowed: permission.allowed,
+        deniedActions: permission.deniedActions || [],
+        warning: permission.warning,
+        serviceName,
+      };
+    } catch (error) {
+      throw new Error(`Failed to check delete permissions: ${error.message}`);
+    }
+  },
+
+  // Delete service
+  deleteServiceCommand: async (profileName, options = {}) => {
+    try {
+      const configFileName = getConfigFileNameForProfile(profileName);
+
+      const config = await loadConfigFile(configFileName);
+      const result = await deleteServiceCommand(config, {
+        ...options,
+        configFileName: path.join(cwd, configFileName),
+      });
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to delete service: ${error.message}`);
+    }
+  },
+
+  // Export AWS helper functions for web manager
+  loadAWSProfile: loadAWSProfile,
+  checkService: checkService
 };
 
 const createNewService = (arroProfileData) => {
@@ -1351,8 +2202,9 @@ const createNewService = (arroProfileData) => {
     });
 };
 
-const deleteServiceCommand = (arroProfileData) => {
+const deleteServiceCommand = (arroProfileData, options = {}) => {
   log(':warning: DELETE SERVICE - This action cannot be undone!');
+  emitProgress(options, 'Starting delete service flow');
 
   // Check permissions
   log(':cyclone: Checking delete permissions...');
@@ -1371,6 +2223,7 @@ const deleteServiceCommand = (arroProfileData) => {
       }
 
       log(':white_check_mark: Permission check passed\n');
+      emitProgress(options, 'Delete permission check passed');
 
       // Show service details
       const table = new Table();
@@ -1396,6 +2249,15 @@ const deleteServiceCommand = (arroProfileData) => {
       // Require user to type service name to confirm
       const serviceName = arroProfileData.service ? arroProfileData.service.split('service/')[1] : arroProfileData.task;
 
+      if (options.nonInteractive) {
+        if (options.confirmServiceName !== serviceName || options.confirmPhrase !== 'DELETE') {
+          return Promise.reject(new Error('Strong delete confirmation failed'));
+        }
+
+        emitProgress(options, `Deletion confirmed for ${serviceName}`);
+        return Promise.resolve({ confirmation: serviceName });
+      }
+
       return inquirer.prompt([{
         type: 'input',
         name: 'confirmation',
@@ -1410,6 +2272,7 @@ const deleteServiceCommand = (arroProfileData) => {
     })
     .then(() => {
       log('\n:cyclone: Starting deletion process...\n');
+      emitProgress(options, 'Running deletion steps');
 
       // First, get the service data to retrieve the task definition ARN
       let taskDefinitionArn = null;
@@ -1489,11 +2352,14 @@ const deleteServiceCommand = (arroProfileData) => {
           return promise.then(() => {
             currentStep++;
             log(`[${currentStep}/${totalSteps}] Deleting ${step.name}...`);
+            emitProgress(options, `[${currentStep}/${totalSteps}] Deleting ${step.name}`);
             return step.action().then((success) => {
               if (success) {
                 log(`:white_check_mark: ${step.name} deleted`);
+                emitProgress(options, `${step.name} deleted`);
               } else {
                 log(`:warning: Failed to delete ${step.name} (may need manual cleanup)`);
+                emitProgress(options, `Failed to delete ${step.name} (manual cleanup may be needed)`);
               }
             });
           });
@@ -1503,8 +2369,18 @@ const deleteServiceCommand = (arroProfileData) => {
     .then(() => {
       log('\n:white_check_mark: Service deletion complete!');
       log(':information_source: Config file still exists. Delete it manually if needed.');
+      emitProgress(options, 'Service deletion complete');
 
       // Optionally delete config file
+      if (options.nonInteractive) {
+        if (options.deleteConfig && options.configFileName) {
+          return new Promise((resolve) => {
+            fs.unlink(options.configFileName, () => resolve());
+          });
+        }
+        return Promise.resolve();
+      }
+
       return inquirer.prompt([{
         type: 'confirm',
         name: 'deleteConfig',
@@ -1513,13 +2389,13 @@ const deleteServiceCommand = (arroProfileData) => {
       }]);
     })
     .then((deleteConfigAnswer) => {
-      if (deleteConfigAnswer.deleteConfig) {
+      if (deleteConfigAnswer && deleteConfigAnswer.deleteConfig) {
         return new Promise((resolve, reject) => {
-          fs.unlink(sFileName, (err) => {
+          fs.unlink(options.configFileName || sFileName, (err) => {
             if (err) {
               log(`:warning: Could not delete config file: ${err.message}`);
             } else {
-              log(`:white_check_mark: Configuration file ${sFileName} deleted`);
+              log(`:white_check_mark: Configuration file ${options.configFileName || sFileName} deleted`);
             }
             resolve();
           });
@@ -1888,8 +2764,6 @@ const configure = arroProfileData => inquirer.prompt([{
 // Main execution function
 (async () => {
   // Determine profile and filename
-  let sProfile = '';
-  let sFileName = '';
 
   // Check if -p flag was provided without a value (will be true) or needs selection
   // Skip profile selection for 'init' command as it has its own profile name prompt
@@ -1907,11 +2781,11 @@ const configure = arroProfileData => inquirer.prompt([{
     }
   } else if (typeof argv.profile === 'string' && argv.profile !== '') {
     // -p flag provided with a value
-    sProfile = argv.profile;
+    sProfile = normalizeProfileName(argv.profile);
   }
   // Otherwise sProfile remains empty (default)
 
-  sFileName = `ECSConfig${sProfile ? `_${sProfile}` : ''}.json`;
+  sFileName = getConfigFileNameForProfile(sProfile);
 
   if (argv._.indexOf('dash') !== -1) {
     loadConfigFile(sFileName)
@@ -1925,6 +2799,16 @@ const configure = arroProfileData => inquirer.prompt([{
     loadConfigFile(sFileName)
       .then(loadAWSProfile)
       .then(deploy)
+      .catch(logError);
+  } else if (argv._.indexOf('force-deploy') !== -1) {
+    loadConfigFile(sFileName)
+      .then(loadAWSProfile)
+      .then(forceDeploymentCommand)
+      .catch(logError);
+  } else if (argv._.indexOf('scale') !== -1) {
+    loadConfigFile(sFileName)
+      .then(loadAWSProfile)
+      .then(arroProfileData => scaleServiceCommand(arroProfileData))
       .catch(logError);
   } else if (argv._.indexOf('commit') !== -1) {
     loadConfigFile(sFileName)
@@ -2035,6 +2919,66 @@ const configure = arroProfileData => inquirer.prompt([{
         log(`:bangbang:  ${err}`);
         process.exit();
       });
+  } else if (argv._.indexOf('web') !== -1) {
+    // Launch web manager
+    const launchWebManager = async () => {
+      try {
+        const net = require('net');
+        const { spawn } = require('child_process');
+
+        // Look for ECSConfig files in current directory
+        const configFiles = fs.readdirSync(process.cwd()).filter(file => file.startsWith('ECSConfig') && file.endsWith('.json'));
+
+        if (configFiles.length === 0) {
+          console.error('No ECSConfig files found in current directory.');
+          console.log('Please run this command from a directory containing ECSConfig*.json files.');
+          process.exit(1);
+        }
+
+        // Find available port starting from 3000
+        const findAvailablePort = (startPort) => {
+          return new Promise((resolve, reject) => {
+            const server = net.createServer();
+
+            server.on('error', (err) => {
+              if (err.code === 'EADDRINUSE') {
+                server.close();
+                findAvailablePort(startPort + 1).then(resolve).catch(reject);
+              } else {
+                reject(err);
+              }
+            });
+
+            server.listen(startPort, () => {
+              const port = server.address().port;
+              server.close(() => resolve(port));
+            });
+          });
+        };
+
+        const port = await findAvailablePort(3000);
+
+        // Set working directory for web manager
+        process.env.ECS_AWS_WORKING_DIR = process.cwd();
+        process.env.ECS_AWS_PORT = port;
+        process.env.ECS_AWS_DEFAULT_PROFILE = sProfile || 'default';
+
+        console.log(`🚀 Starting ECS-AWS Web Manager on port ${port}`);
+        console.log(`📁 Working directory: ${process.cwd()}`);
+        console.log(`📋 Found ${configFiles.length} config file(s): ${configFiles.join(', ')}`);
+
+        // Launch web manager
+        const webManager = require('./web-manager.js');
+
+      } catch (error) {
+        console.error('Failed to start web manager:', error.message);
+        console.log('Make sure you have installed the required dependencies:');
+        console.log('npm install express socket.io open');
+        process.exit(1);
+      }
+    };
+
+    launchWebManager();
   } else {
     let bValidCommand = false;
     loadConfigFile(sFileName)

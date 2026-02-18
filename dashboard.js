@@ -9,6 +9,26 @@ const wait = iSecondInterval => uData => new Promise(resolve => setTimeout(() =>
   resolve(uData);
 }, iSecondInterval * 1000));
 
+const parseClusterName = (clusterValue) => {
+  if (!clusterValue) return '';
+  if (clusterValue.includes('cluster/')) {
+    return clusterValue.split('cluster/')[1];
+  }
+  const parts = clusterValue.split('/');
+  return parts[parts.length - 1] || '';
+};
+
+const parseServiceName = (serviceValue) => {
+  if (!serviceValue) return '';
+  if (serviceValue.includes('service/')) {
+    const servicePart = serviceValue.split('service/')[1];
+    const parts = servicePart.split('/');
+    return parts[parts.length - 1] || '';
+  }
+  const parts = serviceValue.split('/');
+  return parts[parts.length - 1] || serviceValue;
+};
+
 const fGetLogs = (arroProfileData, seconds) => getLogStreams(arroProfileData.log)
   .then((arrsStreams) => {
     if (!arrsStreams || arrsStreams.length === 0) {
@@ -49,6 +69,13 @@ const fGetLogs = (arroProfileData, seconds) => getLogStreams(arroProfileData.log
 
 
 const fGetStats = (arroProfileData, metricName) => {
+  const clusterName = parseClusterName(arroProfileData.cluster);
+  const serviceName = parseServiceName(arroProfileData.service);
+
+  if (!clusterName || !serviceName) {
+    return Promise.resolve([]);
+  }
+
   const params = {
     EndTime: new Date(),
     /* required */
@@ -56,19 +83,19 @@ const fGetStats = (arroProfileData, metricName) => {
     /* required */
     Namespace: 'AWS/ECS',
     /* required */
-    Period: 5,
+    Period: 60,
     /* required */
-    StartTime: moment().subtract(20, 'minutes').unix(),
+    StartTime: moment().subtract(20, 'minutes').toDate(),
     /* required */
     Dimensions: [{
       Name: 'ClusterName',
       /* required */
-      Value: arroProfileData.cluster.split('cluster/')[1], /* required */
+      Value: clusterName, /* required */
     },
     {
       Name: 'ServiceName',
       /* required */
-      Value: arroProfileData.service.split('service/')[1], /* required */
+      Value: serviceName, /* required */
     },
       /* more items */
     ],
@@ -166,11 +193,26 @@ module.exports = (arroProfileData) => {
 
 
   const getMetrics = (sMetricName, line) => fGetStats(arroProfileData, sMetricName).then((data) => {
-    const times = data.map(d => moment(d.Timestamp).format('HH:mm'));
+    const validData = (data || []).filter(dp => dp && dp.Timestamp);
+    const times = validData.map(d => moment(d.Timestamp).format('HH:mm'));
+
+    if (!validData.length) {
+      line.setData([{
+        title: 'Average',
+        x: ['--'],
+        y: [0],
+        style: {
+          line: 'green',
+        },
+      }]);
+
+      return screen.render();
+    }
+
     line.setData([{
       title: 'Average',
       x: times,
-      y: data.map(d => d.Average),
+      y: validData.map(d => d.Average),
       style: {
         line: 'green',
       },
@@ -178,7 +220,7 @@ module.exports = (arroProfileData) => {
     {
       title: 'Minimum',
       x: times,
-      y: data.map(d => d.Minimum),
+      y: validData.map(d => d.Minimum),
       style: {
         line: 'yellow',
       },
@@ -186,7 +228,7 @@ module.exports = (arroProfileData) => {
     {
       title: 'Maximum',
       x: times,
-      y: data.map(d => d.Maximum),
+      y: validData.map(d => d.Maximum),
       style: {
         line: 'red',
       },

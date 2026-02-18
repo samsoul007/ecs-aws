@@ -3,7 +3,7 @@ const { CloudWatchLogsClient, DescribeLogStreamsCommand, GetLogEventsCommand, De
 const { CloudWatchClient, GetMetricStatisticsCommand } = require('@aws-sdk/client-cloudwatch');
 const { ECRClient, DescribeImagesCommand, DescribeRepositoriesCommand, CreateRepositoryCommand, DeleteRepositoryCommand } = require('@aws-sdk/client-ecr');
 const { EC2Client, DescribeRegionsCommand } = require('@aws-sdk/client-ec2');
-const { ElasticLoadBalancingV2Client, DescribeLoadBalancersCommand, DescribeTargetGroupsCommand, DescribeListenersCommand, CreateTargetGroupCommand, CreateRuleCommand, DescribeRulesCommand, DeleteTargetGroupCommand, DeleteRuleCommand } = require('@aws-sdk/client-elastic-load-balancing-v2');
+const { ElasticLoadBalancingV2Client, DescribeLoadBalancersCommand, DescribeTargetGroupsCommand, DescribeTargetHealthCommand, DescribeListenersCommand, CreateTargetGroupCommand, CreateRuleCommand, DescribeRulesCommand, DeleteTargetGroupCommand, DeleteRuleCommand } = require('@aws-sdk/client-elastic-load-balancing-v2');
 const { Route53Client, ListHostedZonesCommand, ChangeResourceRecordSetsCommand } = require('@aws-sdk/client-route-53');
 const { IAMClient, SimulatePrincipalPolicyCommand } = require('@aws-sdk/client-iam');
 const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
@@ -45,7 +45,9 @@ const getLogStreams = async (sLogName) => {
 
   const command = new DescribeLogStreamsCommand(params);
   const data = await cloudwatchlogsClient.send(command);
-  return data.logStreams.map(oStream => oStream.logStreamName);
+  return (data.logStreams || [])
+    .map(oStream => oStream.logStreamName)
+    .filter(logStreamName => typeof logStreamName === 'string' && logStreamName.length > 0);
 };
 
 const getLogEvents = async (logName, streamName, startime) => {
@@ -204,6 +206,41 @@ const updateService = async (arroProfileData, sTag, region) => {
     service: arroProfileData.service,
     taskDefinition: data.taskDefinition.taskDefinitionArn,
     cluster: arroProfileData.cluster,
+  };
+
+  const updateCommand = new UpdateServiceCommand(params);
+  return ecsClient.send(updateCommand);
+};
+
+const forceNewDeployment = async (arroProfileData) => {
+  if (!arroProfileData.service) {
+    throw new Error('Force deployment is only available for ECS services');
+  }
+
+  const params = {
+    service: arroProfileData.service,
+    cluster: arroProfileData.cluster,
+    forceNewDeployment: true,
+  };
+
+  const updateCommand = new UpdateServiceCommand(params);
+  return ecsClient.send(updateCommand);
+};
+
+const updateDesiredCount = async (arroProfileData, desiredCount) => {
+  if (!arroProfileData.service) {
+    throw new Error('Scaling is only available for ECS services');
+  }
+
+  const normalizedCount = Number(desiredCount);
+  if (!Number.isInteger(normalizedCount) || normalizedCount < 0) {
+    throw new Error('Desired task count must be a non-negative integer');
+  }
+
+  const params = {
+    service: arroProfileData.service,
+    cluster: arroProfileData.cluster,
+    desiredCount: normalizedCount,
   };
 
   const updateCommand = new UpdateServiceCommand(params);
@@ -373,6 +410,73 @@ const loadTargetGroups = async (loadBalancerArn) => {
   });
   const data = await elbv2Client.send(command);
   return data.TargetGroups || [];
+};
+
+const describeTargetGroupByArn = async (targetGroupArn) => {
+  if (!targetGroupArn) {
+    return null;
+  }
+
+  const command = new DescribeTargetGroupsCommand({
+    TargetGroupArns: [targetGroupArn],
+  });
+  const data = await elbv2Client.send(command);
+  return (data.TargetGroups || [])[0] || null;
+};
+
+const describeTargetHealthSummary = async (targetGroupArn) => {
+  if (!targetGroupArn) {
+    return {
+      healthy: 0,
+      unhealthy: 0,
+      initial: 0,
+      draining: 0,
+      unused: 0,
+      unavailable: 0,
+      unknown: 0,
+      reasons: [],
+    };
+  }
+
+  const command = new DescribeTargetHealthCommand({
+    TargetGroupArn: targetGroupArn,
+  });
+  const data = await elbv2Client.send(command);
+  const descriptions = data.TargetHealthDescriptions || [];
+
+  const summary = {
+    healthy: 0,
+    unhealthy: 0,
+    initial: 0,
+    draining: 0,
+    unused: 0,
+    unavailable: 0,
+    unknown: 0,
+    reasons: [],
+  };
+
+  const reasonCounter = {};
+
+  descriptions.forEach((item) => {
+    const state = item?.TargetHealth?.State || 'unknown';
+    if (Object.prototype.hasOwnProperty.call(summary, state)) {
+      summary[state] += 1;
+    } else {
+      summary.unknown += 1;
+    }
+
+    const reason = item?.TargetHealth?.Reason;
+    if (reason) {
+      reasonCounter[reason] = (reasonCounter[reason] || 0) + 1;
+    }
+  });
+
+  summary.reasons = Object.keys(reasonCounter)
+    .map((reason) => ({ reason, count: reasonCounter[reason] }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+
+  return summary;
 };
 
 const loadListeners = async (loadBalancerArn) => {
@@ -746,6 +850,8 @@ module.exports = {
   loadAWSProfile,
   loadAWSProfiles,
   updateService,
+  forceNewDeployment,
+  updateDesiredCount,
   checkTag,
   checkLogGroup,
   checkDockerRepo,
@@ -762,6 +868,8 @@ module.exports = {
   createTaskDefinitionForNewService,
   loadLoadBalancers,
   loadTargetGroups,
+  describeTargetGroupByArn,
+  describeTargetHealthSummary,
   loadListeners,
   createTargetGroup,
   createListenerRule,
