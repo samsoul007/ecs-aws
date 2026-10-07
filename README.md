@@ -20,7 +20,7 @@ With the right IAM permissions, the AWS admin can control who has access to what
 
 This CLI uses the AWS CLI key/secretKey to do the requests. Please set that up before.
 
-AWS CLI min 1.11.167: https://aws.amazon.com/cli
+AWS CLI v1 (min 1.11.167) or v2: https://aws.amazon.com/cli. The ECR login uses `get-login` on v1 and `get-login-password` on v2, picked automatically.
 
 Docker: https://docs.docker.com/get-docker/
 
@@ -135,7 +135,9 @@ after initialisation you can:
   - Automatically loads the "default" profile if no profile is specified
   - Use `--profile` or `-p` flag to load a specific profile instead
   - Features include profile selection, service deployment, log viewing, real-time log tailing, and service deletion
-  - Automatically runs on http://localhost:3000
+  - When the directory holds several `ECSConfig*.json` files, the service name in the header is a dropdown to switch between them
+  - Scheduled tasks get their own page: cron expression, countdown to the next run, the next 5 runs and the last log activity
+  - Runs on the first free port from http://localhost:3000
   - Perfect for users who prefer visual interfaces over command-line operations
   - All functionality available in CLI is also accessible through the web interface
   - Examples:
@@ -145,10 +147,14 @@ after initialisation you can:
 #### deployment
 
 - `ecs-aws deploy [--profile profilename]` to deploy the code into ECR & ECS (The GIT short hash will be used as version if available)
+  - For scheduled tasks, the schedule is pointed at the new task definition revision
+  - Local images left by the build (deploy tags, the replaced build, dangling layers) are removed afterwards so the Docker disk does not fill up
 
 #### service commit
 
-- `ecs-aws commit [--profile profilename]` commit your code changes
+- `ecs-aws commit [--profile profilename]` commit your code changes and push them to the current branch on `origin`
+  - Shows the directory, branch and remote before asking for the message
+  - Stops without committing when there is nothing to commit
 
 **This command is available if the directory is a GIT repository**
 
@@ -174,7 +180,7 @@ after initialisation you can:
 
 #### local testing
 
-- `ecs-aws run [--profile profilename]` to run the container locally
+- `ecs-aws run [--profile profilename]` to run the container locally (the container is removed when you exit)
 - `ecs-aws rebuild [--profile profilename]` to rebuild the container image
 
 #### Other parameters:
@@ -198,7 +204,3 @@ If the Dockerfile has been modified run `ecs-aws rebuild [--profile profilename]
 A beta version of the dashboard is available by calling `ecs-aws dash [--profile profilename]`
 
 You can copy the `ECSConfig.json` file and run ecs-aws to see the monitoring if you wish to setup a screen,
-
-## TO-DO
-
-- Being able to setup scheduled containers
