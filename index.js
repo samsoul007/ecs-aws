@@ -57,7 +57,13 @@ const {
   checkCreatePermissions,
   checkDeletePermissions,
   getAccountId,
+  upsertSchedule,
+  deleteSchedule,
+  loadScheduleRoles,
+  createScheduleRole,
 } = require('./aws');
+const ecsCron = require('./cron');
+const readline = require('readline');
 
 // Start arguments
 const { argv } = yargs
@@ -240,28 +246,50 @@ const loadConfigFile = sConfFileName => loadFile(`${cwd}/${sConfFileName}`)
 
 const commit = () => {
   log(':fire: Commit your code.');
+  let sBranch;
 
   return fileExists(`${cwd}/.git`)
     .catch(() => Promise.reject(new Error('Not a git repository (or any of the parent directories).')))
-    .then(() => inquirer.prompt([{
-      type: 'input',
-      name: 'commit',
-      message: 'Enter commit text:',
-    }])
-      .then((answers) => {
-        const spinner = new Spinner('Commiting your code. Please wait...', ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
-        spinner.start();
+    .then(() => exec('git rev-parse --abbrev-ref HEAD', { cwd }))
+    .then((result) => {
+      sBranch = result.stdout.trim();
+      if (!sBranch || sBranch === 'HEAD') {
+        return Promise.reject(new Error('Detached HEAD: check out a branch before committing.'));
+      }
+      return exec('git remote get-url origin', { cwd }).catch(() => ({ stdout: '' }));
+    })
+    .then((result) => {
+      const sRemote = result.stdout.trim();
+      log(`:arrow_forward:  Committing in ${cwd}`);
+      log(`:arrow_forward:  Pushing to branch '${sBranch}' on origin${sRemote ? ` (${sRemote})` : ''}`);
+      return exec('git status --porcelain', { cwd });
+    })
+    .then((result) => {
+      if (!result.stdout.trim()) {
+        log(':zzz: Nothing to commit, working tree clean.');
+        return true;
+      }
 
-        return exec('git add .')
-          .then(() => exec(`git commit -m '${answers.commit}'`))
-          .then(() => exec('git push origin master;'))
-          .then(() => {
-            spinner.stop();
-            log(':+1: Code commited');
+      return inquirer.prompt([{
+        type: 'input',
+        name: 'commit',
+        message: 'Enter commit text:',
+      }])
+        .then((answers) => {
+          const spinner = new Spinner(`Commiting your code to '${sBranch}'. Please wait...`, ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
+          spinner.start();
 
-            return true;
-          });
-      }));
+          return exec('git add .', { cwd })
+            .then(() => exec(`git commit -m '${answers.commit}'`, { cwd }))
+            .then(() => exec(`git push origin '${sBranch}'`, { cwd }))
+            .then(() => {
+              spinner.stop();
+              log(`:+1: Code commited and pushed to origin/${sBranch}`);
+
+              return true;
+            });
+        });
+    });
 };
 
 const rebuildNPM = (oProfile, options = {}) => {
@@ -301,23 +329,68 @@ const rebuildNPM = (oProfile, options = {}) => {
 //   return sts.getCallerIdentity({}).promise().then(data => data.Account);
 // };
 
+// Removes what a deploy leaves on the local docker disk: the ECR-tagged copies of the image
+// (one per deploy tag), the previous build that the new one replaced and any dangling image
+// built by ecs-aws for this repo. Never fails the deploy.
+const cleanupImages = (arroProfileData, sRepoName, sPreviousId) => {
+  const ignore = () => null;
+  return exec(`docker images --format '{{.Repository}}:{{.Tag}}' ${arroProfileData.repo}`)
+    .then((result) => {
+      const arrTags = result.stdout.split('\n').map(s => s.trim()).filter(s => s && !s.endsWith(':<none>'));
+      return arrTags.length ? exec(`docker rmi ${arrTags.join(' ')}`).catch(ignore) : null;
+    })
+    .catch(ignore)
+    .then(() => exec(`docker images -q ${sRepoName}`).catch(() => ({ stdout: '' })))
+    .then((result) => {
+      const sCurrentId = result.stdout.trim();
+      if (sPreviousId && sPreviousId !== sCurrentId) {
+        return exec(`docker rmi ${sPreviousId}`).catch(ignore);
+      }
+      return null;
+    })
+    .then(() => exec(`docker image prune -f --filter label=ecs-aws.repo=${sRepoName}`).catch(ignore));
+};
+
+// AWS CLI v1 only has `ecr get-login`, v2 only has `ecr get-login-password`.
+const ecrLogin = (arroProfileData) => {
+  const sProfile = arroProfileData.profile ? ` --profile ${arroProfileData.profile}` : '';
+
+  return exec('aws --version')
+    .then(result => `${result.stdout}${result.stderr}`)
+    .then((sVersion) => {
+      const match = sVersion.match(/aws-cli\/(\d+)/);
+      const iMajor = match ? parseInt(match[1], 10) : 1;
+
+      if (iMajor < 2) {
+        return exec(`aws ecr get-login --no-include-email${sProfile}`)
+          .then(result => exec(result.stdout.replace('-e none', '')));
+      }
+
+      const sRegistry = arroProfileData.repo.split('/')[0];
+      const regionMatch = sRegistry.match(/\.ecr\.([^.]+)\.amazonaws\.com/);
+      const sRegion = regionMatch ? ` --region ${regionMatch[1]}` : '';
+      return exec(`aws ecr get-login-password${sProfile}${sRegion} | docker login --username AWS --password-stdin ${sRegistry}`);
+    });
+};
+
 const buildImage = (arroProfileData, tag, options = {}) => {
   const sImage = `${arroProfileData.repo}:${tag}`;
   const sRepoName = arroProfileData.repo.split('amazonaws.com/')[1];
   const spinner = new Spinner('Connecting to ECR', ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
+  let sPreviousId = '';
 
   spinner.start();
   emitProgress(options, 'Connecting to ECR');
 
-  return exec(`aws ecr get-login --no-include-email ${arroProfileData.profile ? ` --profile ${arroProfileData.profile}` : ''}`)
-    .then((result) => {
-      const sResult = result.stdout.replace('-e none', '');
-      return exec(sResult);
-    }).then(() => {
+  return ecrLogin(arroProfileData)
+    .then(() => {
       emitProgress(options, `Building Docker image with tag ${tag}`);
       spinner.message(`Building image '${tag}' from docker file '${arroProfileData.dockerfile}'`, ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷']);
       // console.log(`docker build --platform linux/amd64 -f ${arroProfileData.dockerfile} -t ${sRepoName} .`);
-      return exec(`docker build --platform linux/amd64 -f ${arroProfileData.dockerfile} -t ${sRepoName} .`);
+      return exec(`docker images -q ${sRepoName}`)
+        .then((result) => { sPreviousId = result.stdout.trim(); })
+        .catch(() => null)
+        .then(() => exec(`docker build --platform linux/amd64 --label ecs-aws.repo=${sRepoName} -f ${arroProfileData.dockerfile} -t ${sRepoName} .`));
     }).then(() => {
       emitProgress(options, `Tagging image ${tag}`);
       spinner.message(`Tagging image '${tag}' from docker file '${arroProfileData.dockerfile}'`);
@@ -330,14 +403,19 @@ const buildImage = (arroProfileData, tag, options = {}) => {
 
       return exec(`docker push ${sImage}`);
     })
-    // .then(() => {
-    //   spinner.message(`Cleaning up`);
-    //   return exec(`docker rmi $(docker images | grep ${tag} | tr -s ' ' | cut -d ' ' -f 3) --force`);
-    // })
+    .then(() => {
+      emitProgress(options, 'Cleaning up local images');
+      spinner.message('Cleaning up local images');
+      return cleanupImages(arroProfileData, sRepoName, sPreviousId);
+    })
     .then(() => {
       spinner.stop();
       log(':+1: Docker image pushed successfully.');
       emitProgress(options, 'Docker image pushed successfully');
+    })
+    .catch((err) => {
+      spinner.stop();
+      return cleanupImages(arroProfileData, sRepoName, sPreviousId).then(() => Promise.reject(err));
     });
 };
 
@@ -1641,6 +1719,303 @@ module.exports = {
   checkService: checkService
 };
 
+// Lines describing the next runs of a schedule expression (or the parse error)
+const describeNextRuns = (expression, timeZone) => {
+  const result = ecsCron.preview(expression, 5, { timeZone });
+  if (result.error) {
+    return { error: result.error, lines: [`  ✖ ${result.error}`.red] };
+  }
+  const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const lines = ['  Next 5 runs:'.grey].concat(result.runs.map((date, i) => {
+    const scheduled = ecsCron.formatInZone(date, timeZone || 'UTC');
+    const local = localZone && localZone !== (timeZone || 'UTC') ? `   (${ecsCron.formatInZone(date, localZone)} local)`.grey : '';
+    return `  ${i + 1}. ${scheduled}${local}`;
+  }));
+  return { lines };
+};
+
+// Cron input that redraws the next 5 runs below the cursor on every keystroke
+const promptCron = (defaultValue, timeZone) => new Promise((resolve) => {
+  const label = '? Cron expression (min hour day-of-month month day-of-week year): ';
+  log(':information_source: AWS format, e.g. "0 3 * * ? *" (daily 03:00) or "0/15 * ? * MON-FRI *". rate(5 minutes) also works.');
+
+  if (!process.stdin.isTTY) {
+    inquirer.prompt([{
+      type: 'input',
+      name: 'cron',
+      message: 'Cron expression:',
+      default: defaultValue,
+      validate: value => (describeNextRuns(value, timeZone).error || true),
+    }]).then((answers) => {
+      describeNextRuns(answers.cron, timeZone).lines.forEach(line => console.log(line));
+      resolve(answers.cron.trim());
+    });
+    return;
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  let renderedLines = 0;
+
+  const render = () => {
+    const { lines } = describeNextRuns(rl.line, timeZone);
+    const column = label.length + rl.cursor + 1;
+    let out = '\r\n\x1b[J';
+    out += lines.join('\r\n');
+    out += `\x1b[${lines.length}A\x1b[${column}G`;
+    process.stdout.write(out);
+    renderedLines = lines.length;
+  };
+
+  const onKeypress = () => setImmediate(render);
+  process.stdin.on('keypress', onKeypress);
+
+  rl.on('SIGINT', () => {
+    process.stdout.write('\r\n\x1b[J');
+    process.exit(1);
+  });
+
+  rl.on('line', (value) => {
+    const result = describeNextRuns(value, timeZone);
+    if (result.error) {
+      // readline already moved to a new line: go back up and let the user fix the value
+      process.stdout.write(`\x1b[1A\x1b[2K`);
+      rl.setPrompt(label);
+      rl.prompt();
+      rl.write(value);
+      return;
+    }
+    process.stdin.removeListener('keypress', onKeypress);
+    process.stdout.write('\x1b[J');
+    rl.close();
+    console.log(`  ✔ ${ecsCron.toScheduleExpression(value)}`.green);
+    result.lines.forEach(line => console.log(line));
+    resolve(value.trim());
+  });
+
+  rl.setPrompt(label);
+  rl.prompt();
+  if (defaultValue) {
+    rl.write(defaultValue);
+  }
+  render();
+  return renderedLines;
+});
+
+// Asks for schedule type, cron, timezone and IAM role. Returns the config.schedule object.
+const promptSchedule = (arroProfileData, existing = {}) => {
+  const schedule = { name: existing.name };
+
+  return inquirer.prompt([{
+    type: 'list',
+    name: 'type',
+    message: 'How should the task be scheduled?',
+    default: existing.type || 'rule',
+    choices: [
+      { name: 'Scheduled task (EventBridge rule, UTC)', value: 'rule' },
+      { name: 'EventBridge Scheduler (supports timezones)', value: 'scheduler' },
+    ],
+  }])
+    .then((answers) => {
+      schedule.type = answers.type;
+      if (schedule.type !== 'scheduler') {
+        schedule.timezone = 'UTC';
+        return null;
+      }
+      const localZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      return inquirer.prompt([{
+        type: 'input',
+        name: 'timezone',
+        message: 'Timezone (IANA name, e.g. Europe/Paris):',
+        default: existing.timezone || localZone,
+        validate: value => (ecsCron.isValidTimeZone(value) ? true : `Unknown timezone "${value}"`),
+      }]).then((tz) => { schedule.timezone = tz.timezone; });
+    })
+    .then(() => promptCron(existing.cron || '0 3 * * ? *', schedule.timezone))
+    .then((cron) => {
+      schedule.cron = cron;
+      log(':cyclone: Loading IAM roles the schedule can use...');
+      return loadScheduleRoles(schedule.type).catch((err) => {
+        log(`:warning: Could not list IAM roles: ${err.message}`);
+        return [];
+      });
+    })
+    .then((roles) => {
+      const defaultRoleName = `ecs-aws-${schedule.type === 'scheduler' ? 'scheduler' : 'events'}-role`;
+      return inquirer.prompt([{
+        type: 'list',
+        name: 'role',
+        message: 'IAM role used to run the task:',
+        default: existing.role_arn || null,
+        choices: roles.map(role => ({ name: role.name, value: role.arn }))
+          .sort(compare)
+          .concat([
+            { name: `Create a new role (${defaultRoleName})`, value: '__create__' },
+            { name: 'Enter a role ARN', value: '__manual__' },
+          ]),
+      }])
+        .then((answers) => {
+          if (answers.role === '__create__') {
+            log(`:cyclone: Creating IAM role ${defaultRoleName}...`);
+            return createScheduleRole(schedule.type, defaultRoleName).then((role) => {
+              log(`:white_check_mark: Role created: ${role.arn}`);
+              return role.arn;
+            });
+          }
+          if (answers.role === '__manual__') {
+            return inquirer.prompt([{
+              type: 'input',
+              name: 'arn',
+              message: 'Role ARN:',
+              validate: value => (/^arn:aws[\w-]*:iam::\d{12}:role\/.+/.test(value) ? true : 'Not a valid IAM role ARN'),
+            }]).then(manual => manual.arn);
+          }
+          return answers.role;
+        });
+    })
+    .then((roleArn) => {
+      schedule.role_arn = roleArn;
+      return schedule;
+    });
+};
+
+// New cronjob: ECR repo, log group, image, task definition and its schedule (no ECS service, no load balancer)
+const createScheduledService = (arroProfileData) => {
+  log(':alarm_clock: Creating new scheduled task');
+  let serviceName;
+  let ecrRepo;
+  let taskDefArn;
+  let logGroupCreated = false;
+  let scheduleCreated = false;
+  const collectedData = {};
+
+  const rollback = async (errorMessage) => {
+    log('\n:warning: Error occurred. Rolling back created resources...\n');
+    const steps = [];
+    if (scheduleCreated) steps.push({ name: 'Schedule', action: () => deleteSchedule(arroProfileData) });
+    if (taskDefArn) steps.push({ name: 'Task Definition', action: () => deregisterTaskDefinition(taskDefArn) });
+    if (logGroupCreated) steps.push({ name: 'CloudWatch Log Group', action: () => deleteCloudWatchLogGroup(arroProfileData.log) });
+    if (ecrRepo) steps.push({ name: 'ECR Repository', action: () => deleteECRRepository(serviceName) });
+    for (const step of steps) {
+      log(`:cyclone: Deleting ${step.name}...`);
+      const success = await step.action();
+      log(success ? `:white_check_mark: ${step.name} deleted` : `:warning: Failed to delete ${step.name} (may need manual cleanup)`);
+    }
+    log(`\n:x: Rollback complete. Original error: ${errorMessage}`);
+    throw new Error(errorMessage);
+  };
+
+  if (!arroProfileData.dockerfile) {
+    return Promise.reject(new Error('Dockerfile not configured. This should be set during the configure step.'));
+  }
+
+  return inquirer.prompt([{
+    type: 'input',
+    name: 'serviceName',
+    message: 'Enter task name:',
+    validate(value) {
+      const done = this.async();
+      if (!/^[a-zA-Z0-9]([a-zA-Z0-9-_]*[a-zA-Z0-9])?$/.test(value)) {
+        return done('Invalid name: alphanumeric, hyphens and underscores only, not at the start or end');
+      }
+      if (value.length > 64) {
+        return done('Name cannot exceed 64 characters');
+      }
+      return checkDockerRepo(value)
+        .then(() => done(`ECR repository "${value}" already exists. Please choose a different name.`))
+        .catch(() => done(null, true));
+    },
+  }, {
+    type: 'input',
+    default: 128,
+    name: 'container_memory',
+    message: 'Container memory (MB):',
+    filter: Number,
+    validate: value => (Number(value) >= 4 && Number(value) <= 30720 ? true : 'Memory must be between 4 and 30720 MB'),
+  }, {
+    type: 'input',
+    default: 0,
+    name: 'cpu_units',
+    message: 'CPU units:',
+    filter: Number,
+    validate: value => (Number(value) >= 0 ? true : 'CPU units must be 0 or greater'),
+  }])
+    .then((answers) => {
+      _.extend(collectedData, answers);
+      serviceName = answers.serviceName;
+      return addEnvVariables(arroProfileData);
+    })
+    .then((answers) => {
+      collectedData.env = answers.env || [];
+      return promptSchedule(arroProfileData);
+    })
+    .then((schedule) => {
+      _.extend(arroProfileData, {
+        task: serviceName,
+        service: false,
+        log: `/ecs/${serviceName}`,
+        container_memory: collectedData.container_memory,
+        cpu_units: collectedData.cpu_units,
+        env: collectedData.env,
+        host_port: 0,
+        app_port: arroProfileData.app_port || 8080,
+        local_port: arroProfileData.local_port || 8080,
+        schedule,
+      });
+
+      log('\n:rocket: Creating AWS resources...\n');
+      log(`[1/5] Creating ECR repository: ${serviceName}`);
+      return createECRRepository(serviceName)
+        .then((repository) => {
+          ecrRepo = repository;
+          arroProfileData.repo = repository.repositoryUri;
+          log(`:white_check_mark: ECR repository created: ${repository.repositoryUri}\n`);
+          log(`[2/5] Creating CloudWatch log group: ${arroProfileData.log}`);
+          return checkLogGroup(arroProfileData);
+        })
+        .then((result) => {
+          logGroupCreated = result.created;
+          log(result.created ? ':white_check_mark: CloudWatch log group created\n' : ':information_source: CloudWatch log group already exists\n');
+          log('[3/5] Building and pushing Docker image...');
+          return getImageTag(arroProfileData).then(tag => buildImage(arroProfileData, tag).then(() => tag));
+        })
+        .then((imageTag) => {
+          log(`[4/5] Creating task definition: ${serviceName}`);
+          return createTaskDefinitionForNewService({
+            family: serviceName,
+            networkMode: 'bridge',
+            containerDefinitions: [{
+              name: serviceName,
+              image: `${ecrRepo.repositoryUri}:${imageTag}`,
+              memory: collectedData.container_memory,
+              cpu: collectedData.cpu_units,
+              essential: true,
+              environment: collectedData.env,
+              logConfiguration: {
+                logDriver: 'awslogs',
+                options: {
+                  'awslogs-group': arroProfileData.log,
+                  'awslogs-region': arroProfileData.region,
+                  'awslogs-stream-prefix': 'ecs',
+                },
+              },
+            }],
+          });
+        })
+        .then((taskDefinition) => {
+          taskDefArn = taskDefinition.taskDefinitionArn;
+          log(`:white_check_mark: Task definition created: ${taskDefinition.family}:${taskDefinition.revision}\n`);
+          log(`[5/5] Creating ${schedule.type === 'scheduler' ? 'EventBridge schedule' : 'EventBridge rule'}: ${ecsCron.toScheduleExpression(schedule.cron)}`);
+          scheduleCreated = true;
+          return upsertSchedule(arroProfileData, taskDefArn);
+        })
+        .then((result) => {
+          log(`:white_check_mark: Schedule "${result.name}" created (${schedule.timezone || 'UTC'})\n`);
+          return arroProfileData;
+        })
+        .catch(err => rollback(err.message));
+    });
+};
+
 const createNewService = (arroProfileData) => {
   log(':rocket: Creating new ECS service');
 
@@ -2241,6 +2616,9 @@ const deleteServiceCommand = (arroProfileData, options = {}) => {
       log('  4. Listener Rules (if any)');
       log('  5. CloudWatch Log Group');
       log('  6. ECR Repository (including all images)');
+      if (arroProfileData.schedule) {
+        log(`  -  ${arroProfileData.schedule.type === 'scheduler' ? 'EventBridge schedule' : 'EventBridge rule'} (${ecsCron.toScheduleExpression(arroProfileData.schedule.cron)})`);
+      }
       if (arroProfileData.hostname) {
         log('  7. Route53 DNS Record (if exists)');
       }
@@ -2298,6 +2676,14 @@ const deleteServiceCommand = (arroProfileData, options = {}) => {
           deletionSteps.push({
             name: 'ECS Service',
             action: () => deleteECSService(arroProfileData.cluster, arroProfileData.service.split('service/')[1] || arroProfileData.service),
+          });
+        }
+
+        // Schedule first, so it cannot start the task while it is being removed
+        if (arroProfileData.schedule) {
+          deletionSteps.push({
+            name: 'Schedule',
+            action: () => deleteSchedule(arroProfileData),
           });
         }
 
@@ -2512,13 +2898,12 @@ const configure = arroProfileData => inquirer.prompt([{
             value: 'api',
           },
           {
-            name: 'Schedule Service (Coming soon)',
+            name: 'Scheduled task (cronjob)',
             value: 'schedule',
-            disabled: true,
           },
         ],
       }).then((serviceTypeAnswer) => {
-        if (serviceTypeAnswer.serviceType === 'api') {
+        if (serviceTypeAnswer.serviceType === 'api' || serviceTypeAnswer.serviceType === 'schedule') {
           // For API Service, need to select cluster first
           log(':cyclone: Loading ECS clusters ...');
           return loadClusters()
@@ -2535,8 +2920,10 @@ const configure = arroProfileData => inquirer.prompt([{
             }))
             .then((clusterAnswer) => {
               _.extend(arroProfileData, clusterAnswer);
-              // Now call createNewService with cluster set
-              return createNewService(arroProfileData);
+              // Now create the service (or scheduled task) with cluster set
+              return serviceTypeAnswer.serviceType === 'schedule'
+                ? createScheduledService(arroProfileData)
+                : createNewService(arroProfileData);
             })
             .then((updatedProfile) => {
               // Save the configuration after service creation
@@ -2691,12 +3078,19 @@ const configure = arroProfileData => inquirer.prompt([{
     // Otherwise continue with normal flow
     _.extend(arroProfileData, answers);
 
-    return inquirer.prompt({
+    const schedulePromise = answers.service === false
+      ? promptSchedule(arroProfileData, arroProfileData.schedule || {}).then((schedule) => {
+        arroProfileData.schedule = schedule;
+        log(':information_source: The schedule is created or updated on the next deploy.');
+      })
+      : Promise.resolve();
+
+    return schedulePromise.then(() => inquirer.prompt({
       type: 'input',
       default: arroProfileData.log || (arroProfileData.task),
       name: 'log',
       message: 'Log group name:',
-    })
+    }))
       .then((logAnswers) => {
         _.extend(arroProfileData, logAnswers);
 
@@ -2903,7 +3297,7 @@ const configure = arroProfileData => inquirer.prompt([{
           })
           .then(() => new Promise(((resolve) => {
             log(`:arrow_forward:  Running local container on ${'localhost'}:${oProfile.local_port} with docker image '${sImage}' [${oProfile.container_memory}MB]`);
-            const sCMD = `docker run --platform linux/amd64 --shm-size ${oProfile.container_memory}m  --publish ${oProfile.local_port}:${oProfile.app_port} -ti -w /app -v ${process.cwd()}:/app '${sImage}' bash`;
+            const sCMD = `docker run --rm --platform linux/amd64 --shm-size ${oProfile.container_memory}m  --publish ${oProfile.local_port}:${oProfile.app_port} -ti -w /app -v ${process.cwd()}:/app '${sImage}' bash`;
             console.log(sCMD)
             try {
               childProcess.execSync(sCMD, {

@@ -83,6 +83,43 @@
         body.dark-mode .shadow-xl {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45) !important;
         }
+
+        advanced-metric-card {
+            display: block;
+        }
+
+        service-overview-grid {
+            display: contents;
+        }
+
+        service-health-badge,
+        dialog-field-input,
+        toast-message {
+            display: block;
+        }
+
+        service-type-badge {
+            display: inline-block;
+        }
+
+        wizard-env-row {
+            display: block;
+        }
+
+        wizard-step-indicator {
+            display: block;
+        }
+
+        profile-wizard {
+            display: block;
+        }
+
+        wizard-subtitle,
+        wizard-error-banner,
+        operation-modal,
+        confirm-dialog {
+            display: block;
+        }
     </style>
 </head>
 
@@ -101,39 +138,21 @@
 
                 <!-- Right side: Service actions and status -->
                 <div class="flex items-center space-x-4">
-                    <button id="darkModeBtn"
-                        class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                        <i id="darkModeIcon" class="fa-regular fa-moon"></i>
-                        <span id="darkModeLabel">Dark</span>
-                    </button>
+                    <ui-button id="darkModeBtn" variant="secondary" icon="fa-regular fa-moon" label="Dark"></ui-button>
                     <div id="topActionButtons" class="hidden flex items-center gap-2">
-                        <button id="refreshBtn"
-                            class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                            <i id="refreshIcon" class="fa-solid fa-rotate"></i>
-                            <span>Refresh</span>
-                        </button>
-                        <button id="deployBtn"
-                            class="inline-flex items-center gap-2 bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">
-                            <i class="fa-solid fa-rocket"></i>
-                            <span>Deploy</span>
-                        </button>
-                        <button id="forceDeployBtn"
-                            class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors">
-                            <i class="fa-solid fa-rotate-right"></i>
-                            <span>Force Deploy</span>
-                        </button>
-                        <button id="scaleBtn"
-                            class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                            <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
-                            <span>Scale</span>
-                        </button>
+                        <ui-button id="refreshBtn" variant="secondary" icon="fa-solid fa-rotate"
+                            label="Refresh"></ui-button>
+                        <ui-button id="deployBtn" variant="primary" icon="fa-solid fa-rocket"
+                            label="Deploy"></ui-button>
+                        <ui-button id="forceDeployBtn" variant="indigo-secondary" icon="fa-solid fa-rotate-right"
+                            label="Force Deploy"></ui-button>
+                        <ui-button id="scaleBtn" variant="secondary"
+                            icon="fa-solid fa-up-right-and-down-left-from-center" label="Scale"></ui-button>
                     </div>
                     <div id="profileInfo" class="flex items-center space-x-4 text-sm text-gray-600">
                         <div id="serviceName" class="hidden">
-                            <label for="serviceSwitcher" class="text-xs text-gray-500 uppercase tracking-wide block">Service</label>
+                            <span class="text-xs text-gray-500 uppercase tracking-wide">Service</span>
                             <div class="font-medium text-gray-900"></div>
-                            <select id="serviceSwitcher"
-                                class="hidden font-medium text-gray-900 border border-gray-300 rounded-md text-sm px-2 py-1 pr-8"></select>
                         </div>
                     </div>
                     <div id="serviceStatus" class="hidden">
@@ -162,19 +181,13 @@
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-gray-900 flex items-center">
                     <i class="fa-solid fa-chart-line mr-2 text-indigo-600"></i>
-                    <span id="overviewTitle">Service Overview</span>
+                    Service Overview
                 </h2>
                 <div class="flex items-center gap-2">
-                    <button id="editConfigBtn"
-                        class="inline-flex items-center gap-2 border border-indigo-300 text-indigo-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-50 transition-colors">
-                        <i class="fa-solid fa-pen-to-square"></i>
-                        <span>Edit Configuration</span>
-                    </button>
-                    <button id="deleteBtn"
-                        class="inline-flex items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition-colors hidden">
-                        <i class="fa-regular fa-trash-can"></i>
-                        <span>Delete Service</span>
-                    </button>
+                    <ui-button id="editConfigBtn" variant="indigo-secondary" icon="fa-solid fa-pen-to-square"
+                        label="Edit Configuration"></ui-button>
+                    <ui-button id="deleteBtn" class="hidden" variant="danger" icon="fa-regular fa-trash-can"
+                        label="Delete Service"></ui-button>
                 </div>
             </div>
             <div id="serviceInfo" class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -186,34 +199,19 @@
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <i class="fa-solid fa-list-check mr-2 text-indigo-600"></i>
-                <span id="logsCardTitle">Logs & Events</span>
+                Logs & Events
             </h2>
             <div class="flex flex-wrap gap-3">
-                <button id="logsBtn"
-                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                    <i class="fa-regular fa-file-lines"></i>
-                    <span>Logs</span>
-                </button>
-                <button id="eventsBtn"
-                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                    <i class="fa-solid fa-bolt"></i>
-                    <span>Events</span>
-                </button>
-                <button id="tailBtn"
-                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors">
-                    <i class="fa-solid fa-wave-square"></i>
-                    <span>Tail</span>
-                </button>
-                <button id="stopTailBtn"
-                    class="inline-flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors hidden">
-                    <i class="fa-solid fa-stop"></i>
-                    <span>Stop Tail</span>
-                </button>
+                <ui-button id="logsBtn" variant="secondary" icon="fa-regular fa-file-lines" label="Logs"></ui-button>
+                <ui-button id="eventsBtn" variant="secondary" icon="fa-solid fa-bolt" label="Events"></ui-button>
+                <ui-button id="tailBtn" variant="secondary" icon="fa-solid fa-wave-square" label="Tail"></ui-button>
+                <ui-button id="stopTailBtn" class="hidden" variant="secondary" icon="fa-solid fa-stop"
+                    label="Stop Tail"></ui-button>
             </div>
         </div>
 
         <!-- Dashboard Areas -->
-        <div id="dashboardGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <i class="fa-solid fa-cubes mr-2 text-indigo-600"></i>
@@ -239,7 +237,7 @@
                 </div>
             </div>
 
-            <div id="serviceEventsCard" class="bg-white rounded-lg shadow-lg p-6">
+            <div class="bg-white rounded-lg shadow-lg p-6">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <i class="fa-solid fa-bolt mr-2 text-indigo-600"></i>
                     Service Events
@@ -265,7 +263,7 @@
             </div>
         </div>
 
-        <div id="metricsCard" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-lg font-semibold text-gray-900 flex items-center">
                     <i class="fa-solid fa-chart-area mr-2 text-indigo-600"></i>
@@ -336,7 +334,7 @@
             </div>
         </div>
 
-        <div id="advancedMetricsCard" class="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                 <i class="fa-solid fa-gauge-high mr-2 text-indigo-600"></i>
                 Advanced Metrics
@@ -345,7 +343,7 @@
         </div>
     </div>
 
-    <div id="operationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <operation-modal id="operationModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-gray-900/60" id="operationBackdrop"></div>
         <div class="relative w-full max-w-5xl bg-white rounded-lg shadow-xl border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -379,9 +377,9 @@
                 </div>
             </div>
         </div>
-    </div>
+    </operation-modal>
 
-    <div id="dialogModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <confirm-dialog id="dialogModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4">
         <div id="dialogBackdrop" class="absolute inset-0 bg-gray-900/60"></div>
         <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl border border-gray-200">
             <div class="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -396,17 +394,11 @@
                 <div id="dialogError" class="hidden mt-3 text-sm text-red-600"></div>
             </div>
             <div class="px-5 py-4 border-t border-gray-200 flex items-center justify-end gap-2">
-                <button id="dialogCancelBtn"
-                    class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">
-                    Cancel
-                </button>
-                <button id="dialogConfirmBtn"
-                    class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
-                    Confirm
-                </button>
+                <ui-button id="dialogCancelBtn" variant="secondary" label="Cancel"></ui-button>
+                <ui-button id="dialogConfirmBtn" variant="primary" label="Confirm"></ui-button>
             </div>
         </div>
-    </div>
+    </confirm-dialog>
 
     <div id="toastContainer"
         class="fixed bottom-4 right-4 z-[80] flex flex-col gap-2 w-[22rem] max-w-[calc(100vw-2rem)] pointer-events-none">
@@ -425,26 +417,23 @@
         </div>
     </div>
 
-    <div id="profileWizard"
+    <profile-wizard id="profileWizard"
         class="hidden fixed inset-0 z-[70] bg-gradient-to-br from-primary to-secondary overflow-hidden">
         <div class="w-full h-full">
             <div class="bg-white h-full w-full flex flex-col overflow-hidden">
                 <div class="px-6 py-5 border-b border-gray-200">
                     <h2 class="text-xl font-semibold text-gray-900">Profile Setup Wizard</h2>
-                    <p id="wizardSubtitle" class="text-sm text-gray-600 mt-1">Choose a Dockerfile path and verify its
-                        contents before continuing.</p>
+                    <wizard-subtitle id="wizardSubtitle"
+                        text="Choose a Dockerfile path and verify its contents before continuing."></wizard-subtitle>
                     <div class="mt-4 grid grid-cols-5 gap-2 text-xs" id="wizardStepIndicators">
-                        <div id="wizardStepIndicator1"
-                            class="px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-medium text-center">1.
-                            Dockerfile</div>
-                        <div id="wizardStepIndicator2" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
-                            2. Profile</div>
-                        <div id="wizardStepIndicator3" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
-                            3. Region</div>
-                        <div id="wizardStepIndicator4" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
-                            4. Service Mode</div>
-                        <div id="wizardStepIndicator5" class="px-2 py-1 rounded bg-gray-100 text-gray-600 text-center">
-                            5. Container + Env</div>
+                        <wizard-step-indicator id="wizardStepIndicator1" label="1. Dockerfile"
+                            active="true"></wizard-step-indicator>
+                        <wizard-step-indicator id="wizardStepIndicator2" label="2. Profile"></wizard-step-indicator>
+                        <wizard-step-indicator id="wizardStepIndicator3" label="3. Region"></wizard-step-indicator>
+                        <wizard-step-indicator id="wizardStepIndicator4"
+                            label="4. Service Mode"></wizard-step-indicator>
+                        <wizard-step-indicator id="wizardStepIndicator5"
+                            label="5. Container + Env"></wizard-step-indicator>
                     </div>
                 </div>
 
@@ -649,42 +638,6 @@
                             <div id="wizardEnvRows" class="space-y-2"></div>
                         </div>
 
-                        <div id="wizardScheduleSection"
-                            class="hidden space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
-                            <h4 class="text-sm font-semibold text-gray-900">Schedule</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label for="wizardScheduleType" class="block text-sm font-medium text-gray-700 mb-1">Schedule Type</label>
-                                    <select id="wizardScheduleType"
-                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900">
-                                        <option value="rule">Scheduled task (EventBridge rule, UTC)</option>
-                                        <option value="scheduler">EventBridge Scheduler (supports timezones)</option>
-                                    </select>
-                                </div>
-                                <div id="wizardScheduleTimezoneWrap" class="hidden">
-                                    <label for="wizardScheduleTimezone" class="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-                                    <input id="wizardScheduleTimezone" type="text" placeholder="Europe/Paris" list="wizardScheduleTimezoneList"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" />
-                                    <datalist id="wizardScheduleTimezoneList"></datalist>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label for="wizardScheduleCron" class="block text-sm font-medium text-gray-700 mb-1">Cron Expression</label>
-                                    <input id="wizardScheduleCron" type="text" value="0 3 * * ? *" spellcheck="false"
-                                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 font-mono" />
-                                    <p class="text-xs text-gray-500 mt-1">minutes hours day-of-month month day-of-week year. Use "?" in one of the day fields. rate(5 minutes) also works.</p>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Next 5 runs</div>
-                                    <ol id="wizardSchedulePreview" class="text-sm text-gray-900 space-y-1 font-mono"></ol>
-                                </div>
-                                <div class="md:col-span-2">
-                                    <label for="wizardScheduleRole" class="block text-sm font-medium text-gray-700 mb-1">IAM Role (runs the task)</label>
-                                    <select id="wizardScheduleRole"
-                                        class="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md text-sm text-gray-900"></select>
-                                </div>
-                            </div>
-                        </div>
-
                         <div id="wizardNewServiceSection"
                             class="hidden space-y-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
                             <h4 class="text-sm font-semibold text-gray-900">New Service Creation Flow</h4>
@@ -763,36 +716,24 @@
                         </div>
                     </div>
 
-                    <div id="wizardError" class="hidden text-sm text-red-600"></div>
+                    <wizard-error-banner id="wizardError" class="hidden"></wizard-error-banner>
                 </div>
 
                 <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                     <div></div>
                     <div class="flex items-center gap-2">
-                        <button id="wizardCancelBtn"
-                            class="hidden inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button id="wizardPrevBtn"
-                            class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 hidden">
-                            Back
-                        </button>
-                        <button id="wizardNextBtn"
-                            class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
-                            Next
-                        </button>
-                        <button id="wizardCreateBtn"
-                            class="hidden inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700">
-                            Create Profile
-                        </button>
+                        <ui-button id="wizardCancelBtn" class="hidden" variant="secondary" label="Cancel"></ui-button>
+                        <ui-button id="wizardPrevBtn" class="hidden" variant="secondary" label="Back"></ui-button>
+                        <ui-button id="wizardNextBtn" variant="primary" label="Next"></ui-button>
+                        <ui-button id="wizardCreateBtn" class="hidden" variant="primary"
+                            label="Create Profile"></ui-button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </profile-wizard>
 
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/cron.js"></script>
     <script>
         const socket = io();
         let currentProfile = '';
@@ -805,17 +746,6 @@
         const errorMessage = document.getElementById('errorMessage');
         const profileName = document.getElementById('profileName');
         const serviceName = document.getElementById('serviceName');
-        const serviceSwitcher = document.getElementById('serviceSwitcher');
-        const wizardScheduleSection = document.getElementById('wizardScheduleSection');
-        const wizardScheduleType = document.getElementById('wizardScheduleType');
-        const wizardScheduleTimezoneWrap = document.getElementById('wizardScheduleTimezoneWrap');
-        const wizardScheduleTimezone = document.getElementById('wizardScheduleTimezone');
-        const wizardScheduleTimezoneList = document.getElementById('wizardScheduleTimezoneList');
-        const wizardScheduleCron = document.getElementById('wizardScheduleCron');
-        const wizardSchedulePreview = document.getElementById('wizardSchedulePreview');
-        const wizardScheduleRole = document.getElementById('wizardScheduleRole');
-        const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-        let wizardScheduleRoleArn = '';
         const serviceStatus = document.getElementById('serviceStatus');
         const serviceInfo = document.getElementById('serviceInfo');
         const resourceDetailsBody = document.getElementById('resourceDetailsBody');
@@ -846,20 +776,13 @@
         const actionResult = document.getElementById('actionResult');
         const toastContainer = document.getElementById('toastContainer');
         const darkModeBtn = document.getElementById('darkModeBtn');
-        const darkModeIcon = document.getElementById('darkModeIcon');
-        const darkModeLabel = document.getElementById('darkModeLabel');
         const refreshBtn = document.getElementById('refreshBtn');
-        const refreshIcon = document.getElementById('refreshIcon');
         const topActionButtons = document.getElementById('topActionButtons');
         const profileWizard = document.getElementById('profileWizard');
-        const wizardSubtitle = document.getElementById('wizardSubtitle');
         const wizardConfigProfile = document.getElementById('wizardConfigProfile');
         const wizardAwsProfile = document.getElementById('wizardAwsProfile');
         const wizardRegion = document.getElementById('wizardRegion');
         const wizardServiceMode = document.getElementById('wizardServiceMode');
-        const wizardStep5Title = document.getElementById('wizardStep5Title');
-        const wizardExistingServiceSection = document.getElementById('wizardExistingServiceSection');
-        const wizardNewServiceResourcesSection = document.getElementById('wizardNewServiceResourcesSection');
         const wizardRepo = document.getElementById('wizardRepo');
         const wizardCluster = document.getElementById('wizardCluster');
         const wizardNewCluster = document.getElementById('wizardNewCluster');
@@ -885,12 +808,14 @@
         const wizardNewHostnameWrap = document.getElementById('wizardNewHostnameWrap');
         const wizardNewHostname = document.getElementById('wizardNewHostname');
         const wizardEnvRows = document.getElementById('wizardEnvRows');
-        const wizardAddEnvBtn = document.getElementById('wizardAddEnvBtn');
-        const wizardCancelBtn = document.getElementById('wizardCancelBtn');
-        const wizardPrevBtn = document.getElementById('wizardPrevBtn');
-        const wizardNextBtn = document.getElementById('wizardNextBtn');
-        const wizardCreateBtn = document.getElementById('wizardCreateBtn');
-        const wizardError = document.getElementById('wizardError');
+        const wizardUi = {
+            addEnvBtn: document.getElementById('wizardAddEnvBtn'),
+            cancelBtn: document.getElementById('wizardCancelBtn'),
+            prevBtn: document.getElementById('wizardPrevBtn'),
+            nextBtn: document.getElementById('wizardNextBtn'),
+            createBtn: document.getElementById('wizardCreateBtn'),
+            error: document.getElementById('wizardError'),
+        };
         const MAX_OUTPUT_ROWS = 500;
         const OUTPUT_PAGE_SIZE = 100;
         const AUTO_REFRESH_MS = 5000;
@@ -916,6 +841,619 @@
         let wizardEditMode = false;
         let darkModeEnabled = false;
 
+        class AdvancedMetricCard extends HTMLElement {
+            static get observedAttributes() {
+                return ['title', 'value', 'subtitle', 'tone'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            render() {
+                const title = this.getAttribute('title') || '';
+                const value = this.getAttribute('value') || '';
+                const subtitle = this.getAttribute('subtitle') || '';
+                const tone = this.getAttribute('tone') || 'neutral';
+                const toneClassMap = {
+                    good: 'text-green-700 bg-green-50 border-green-200',
+                    warn: 'text-yellow-700 bg-yellow-50 border-yellow-200',
+                    bad: 'text-red-700 bg-red-50 border-red-200',
+                    neutral: 'text-gray-900 bg-gray-50 border-gray-200',
+                };
+
+                const toneClass = toneClassMap[tone] || toneClassMap.neutral;
+
+                this.innerHTML = `
+                    <div class="border rounded-lg p-4 ${toneClass}">
+                        <div class="text-xs uppercase tracking-wide opacity-80 mb-1">${escapeHtml(title)}</div>
+                        <div class="text-lg font-semibold">${escapeHtml(String(value))}</div>
+                        <div class="text-xs mt-1 opacity-80 whitespace-pre-wrap">${escapeHtml(subtitle)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        if (!customElements.get('advanced-metric-card')) {
+            customElements.define('advanced-metric-card', AdvancedMetricCard);
+        }
+
+        class ServiceOverviewGrid extends HTMLElement {
+            set data(value) {
+                this._data = value || {};
+                this.render();
+            }
+
+            get data() {
+                return this._data || {};
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            render() {
+                const info = this._data?.info || {};
+                const healthVisual = this._data?.healthVisual || getServiceHealthVisual(info);
+                const serviceModeLabel = this._data?.serviceModeLabel || 'Existing Service';
+                const awsProfile = this._data?.awsProfile || 'default';
+                const containerMemory = this._data?.containerMemory ?? 'N/A';
+                const cpuUnits = this._data?.cpuUnits ?? 'N/A';
+                const appPort = this._data?.appPort ?? 'N/A';
+                const hostPortDisplay = this._data?.hostPortDisplay ?? 'N/A';
+                const localPort = this._data?.localPort ?? 'N/A';
+                const dockerfilePath = this._data?.dockerfilePath || 'N/A';
+
+                this.innerHTML = `
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Task Definition</div>
+                        <div class="font-medium text-gray-900 truncate">
+                            ${info.taskDefinition || 'N/A'}
+                            ${info.taskDefinitionVersion && info.taskDefinitionVersion !== 'N/A'
+                        ? `<span class="ml-2 text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">v${escapeHtml(info.taskDefinitionVersion)}</span>`
+                        : ''}
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Running / Desired</div>
+                        <div class="font-medium ${healthVisual.valueClass} flex items-center gap-2">
+                            <i class="${healthVisual.iconClass}"></i>
+                            <span>${info.runningCount || 0} / ${info.desiredCount || 0}</span>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Pending Tasks</div>
+                        <div class="font-medium text-gray-900">${info.pendingCount || 0}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Created</div>
+                        <div class="font-medium text-gray-900">${formatDateTime(info.createdAt)}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Last Deployment</div>
+                        <div class="font-medium text-gray-900">${formatDashboardDateTime(info.lastDeploymentAt)}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">AWS Profile</div>
+                        <div class="font-medium text-gray-900">${escapeHtml(String(awsProfile))}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Container Memory</div>
+                        <div class="font-medium text-gray-900">${escapeHtml(String(containerMemory))}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">CPU Units</div>
+                        <div class="font-medium text-gray-900">${escapeHtml(String(cpuUnits))}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Ports (App / Host / Local)</div>
+                        <div class="font-medium text-gray-900">${escapeHtml(String(appPort))} / ${escapeHtml(String(hostPortDisplay))} / ${escapeHtml(String(localPort))}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Dockerfile</div>
+                        <div class="font-medium text-gray-900 break-all">${escapeHtml(String(dockerfilePath))}</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="text-sm text-gray-500 mb-1">Service Mode</div>
+                        <div class="font-medium text-gray-900">${escapeHtml(serviceModeLabel)}</div>
+                    </div>
+                `;
+            }
+        }
+
+        if (!customElements.get('service-overview-grid')) {
+            customElements.define('service-overview-grid', ServiceOverviewGrid);
+        }
+
+        class ServiceHealthBadge extends HTMLElement {
+            static get observedAttributes() {
+                return ['badge-class', 'icon-class', 'label'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            render() {
+                const badgeClass = this.getAttribute('badge-class') || '';
+                const iconClass = this.getAttribute('icon-class') || '';
+                const label = this.getAttribute('label') || '';
+
+                this.innerHTML = `
+                    <span class="${badgeClass}">
+                        <i class="${iconClass}"></i>
+                        ${escapeHtml(label)}
+                    </span>
+                `;
+            }
+        }
+
+        if (!customElements.get('service-health-badge')) {
+            customElements.define('service-health-badge', ServiceHealthBadge);
+        }
+
+        class DialogFieldInput extends HTMLElement {
+            set fieldData(value) {
+                this._fieldData = value || {};
+                this.render();
+            }
+
+            get fieldData() {
+                return this._fieldData || {};
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            focusInput() {
+                const input = this.querySelector('input[data-dialog-field]');
+                if (input) {
+                    input.focus();
+                }
+            }
+
+            render() {
+                const field = this._fieldData || {};
+                const inputId = `dialog-field-${field.name || 'field'}`;
+                const fieldType = field.type === 'number' ? 'number' : 'text';
+
+                this.innerHTML = `
+                    <label for="${inputId}" class="block text-sm font-medium text-gray-700 mb-1">${escapeHtml(field.label || field.name || '')}</label>
+                    <input
+                        id="${inputId}"
+                        data-dialog-field="${escapeHtml(field.name || '')}"
+                        type="${fieldType}"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        value="${escapeHtml(field.value ?? '')}"
+                        ${field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : ''}
+                        ${field.min !== undefined ? `min="${escapeHtml(field.min)}"` : ''}
+                    />
+                `;
+            }
+        }
+
+        if (!customElements.get('dialog-field-input')) {
+            customElements.define('dialog-field-input', DialogFieldInput);
+        }
+
+        class ToastMessage extends HTMLElement {
+            static get observedAttributes() {
+                return ['type', 'message'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            render() {
+                const type = this.getAttribute('type') || 'info';
+                const message = this.getAttribute('message') || '';
+                const styleMap = {
+                    success: {
+                        box: 'bg-green-50 border-green-200 text-green-800',
+                        icon: 'fa-circle-check text-green-600',
+                    },
+                    error: {
+                        box: 'bg-red-50 border-red-200 text-red-800',
+                        icon: 'fa-circle-exclamation text-red-600',
+                    },
+                    info: {
+                        box: 'bg-blue-50 border-blue-200 text-blue-800',
+                        icon: 'fa-circle-info text-blue-600',
+                    },
+                };
+
+                const selected = styleMap[type] || styleMap.info;
+                this.className = `pointer-events-auto border rounded-md shadow-lg px-3 py-2 text-sm flex items-start gap-2 transition-opacity duration-200 ${selected.box}`;
+                this.innerHTML = `
+                    <i class="fa-solid ${selected.icon} mt-0.5"></i>
+                    <div class="flex-1 break-words">${escapeHtml(String(message || ''))}</div>
+                `;
+            }
+        }
+
+        if (!customElements.get('toast-message')) {
+            customElements.define('toast-message', ToastMessage);
+        }
+
+        class ServiceTypeBadge extends HTMLElement {
+            static get observedAttributes() {
+                return ['service-type'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            render() {
+                const value = this.getAttribute('service-type') || 'ecs-service';
+                const isScheduled = value === 'scheduled-task';
+                const label = isScheduled ? 'Scheduled Task' : 'ECS Service';
+                const badgeClass = isScheduled
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-green-100 text-green-800';
+
+                this.innerHTML = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}">${label}</span>`;
+            }
+        }
+
+        if (!customElements.get('service-type-badge')) {
+            customElements.define('service-type-badge', ServiceTypeBadge);
+        }
+
+        class WizardEnvRow extends HTMLElement {
+            set envKey(value) {
+                this._envKey = String(value ?? '');
+                this.render();
+            }
+
+            set envValue(value) {
+                this._envValue = String(value ?? '');
+                this.render();
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            getPair() {
+                const keyInput = this.querySelector('[data-env-key]');
+                const valueInput = this.querySelector('[data-env-value]');
+                return {
+                    key: (keyInput?.value || '').trim(),
+                    value: (valueInput?.value || '').trim(),
+                };
+            }
+
+            render() {
+                const key = this._envKey || '';
+                const value = this._envValue || '';
+                this.setAttribute('data-env-row', 'true');
+                this.className = 'border border-gray-200 rounded-md p-3';
+                this.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+                        <input data-env-key type="text" placeholder="Key"
+                            class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(key)}" />
+                        <input data-env-value type="text" placeholder="Value"
+                            class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(value)}" />
+                        <div class="md:col-span-2 flex items-center justify-end gap-2">
+                            <i data-env-check class="fa-solid fa-check text-green-600 hidden"></i>
+                            <button data-env-remove type="button" class="inline-flex items-center px-2 py-1 rounded text-xs border border-gray-300 text-gray-700 hover:bg-gray-50">Remove</button>
+                        </div>
+                    </div>
+                `;
+
+                const keyInput = this.querySelector('[data-env-key]');
+                const valueInput = this.querySelector('[data-env-value]');
+                const removeButton = this.querySelector('[data-env-remove]');
+
+                if (keyInput) {
+                    keyInput.addEventListener('input', () => {
+                        this.dispatchEvent(new CustomEvent('wizard-env-change', { bubbles: true }));
+                    });
+                }
+
+                if (valueInput) {
+                    valueInput.addEventListener('input', () => {
+                        this.dispatchEvent(new CustomEvent('wizard-env-change', { bubbles: true }));
+                    });
+                }
+
+                if (removeButton) {
+                    removeButton.addEventListener('click', () => {
+                        this.dispatchEvent(new CustomEvent('wizard-env-remove', {
+                            bubbles: true,
+                            detail: { row: this },
+                        }));
+                    });
+                }
+            }
+        }
+
+        if (!customElements.get('wizard-env-row')) {
+            customElements.define('wizard-env-row', WizardEnvRow);
+        }
+
+        class WizardStepIndicator extends HTMLElement {
+            static get observedAttributes() {
+                return ['label', 'active'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            render() {
+                const label = this.getAttribute('label') || '';
+                const isActive = this.getAttribute('active') === 'true';
+                const activeClass = isActive
+                    ? 'px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-medium text-center'
+                    : 'px-2 py-1 rounded bg-gray-100 text-gray-600 text-center';
+
+                this.innerHTML = `<div class="${activeClass}">${escapeHtml(label)}</div>`;
+            }
+        }
+
+        if (!customElements.get('wizard-step-indicator')) {
+            customElements.define('wizard-step-indicator', WizardStepIndicator);
+        }
+
+        class UiButton extends HTMLElement {
+            static get observedAttributes() {
+                return ['label', 'variant', 'disabled', 'type', 'icon', 'loading'];
+            }
+
+            connectedCallback() {
+                if (!this.hasAttribute('label')) {
+                    const initialText = (this.textContent || '').trim();
+                    if (initialText) {
+                        this.setAttribute('label', initialText);
+                    }
+                }
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            focus(options) {
+                const button = this.querySelector('button');
+                if (button) {
+                    button.focus(options);
+                    return;
+                }
+                HTMLElement.prototype.focus.call(this, options);
+            }
+
+            get disabled() {
+                return this.hasAttribute('disabled');
+            }
+
+            set disabled(value) {
+                if (value) {
+                    this.setAttribute('disabled', '');
+                } else {
+                    this.removeAttribute('disabled');
+                }
+            }
+
+            render() {
+                const label = this.getAttribute('label') || '';
+                const variant = this.getAttribute('variant') || 'secondary';
+                const type = this.getAttribute('type') || 'button';
+                const icon = this.getAttribute('icon') || '';
+                const disabled = this.disabled;
+                const loading = this.hasAttribute('loading');
+
+                const variantClassMap = {
+                    primary: 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500',
+                    secondary: 'border border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-indigo-500',
+                    'indigo-secondary': 'border border-indigo-300 text-indigo-700 hover:bg-indigo-50 focus:ring-indigo-500',
+                    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+                };
+
+                const variantClass = variantClassMap[variant] || variantClassMap.secondary;
+                const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed hover:bg-inherit' : '';
+                const iconClasses = loading ? `${icon} fa-spin` : icon;
+
+                this.innerHTML = `
+                    <button
+                        type="${escapeHtml(type)}"
+                        class="inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-1 ${variantClass} ${disabledClasses}"
+                        ${disabled ? 'disabled' : ''}
+                    >${icon ? `<i class="${escapeHtml(iconClasses)} mr-2"></i>` : ''}<span>${escapeHtml(label)}</span></button>
+                `;
+            }
+        }
+
+        if (!customElements.get('ui-button')) {
+            customElements.define('ui-button', UiButton);
+        }
+
+        class ProfileWizard extends HTMLElement {
+            applyWizardState({ step, subtitle, modeIsNew, editMode }) {
+                const subtitleEl = this.querySelector('#wizardSubtitle');
+                if (subtitleEl) {
+                    if (typeof subtitleEl.setSubtitle === 'function') {
+                        subtitleEl.setSubtitle(subtitle || '');
+                    } else {
+                        subtitleEl.textContent = subtitle || '';
+                    }
+                }
+
+                for (let panelStep = 1; panelStep <= 5; panelStep += 1) {
+                    const panel = this.querySelector(`#wizardStep${panelStep}`);
+                    const indicator = this.querySelector(`#wizardStepIndicator${panelStep}`);
+                    if (!panel || !indicator) continue;
+
+                    if (panelStep === step) {
+                        panel.classList.remove('hidden');
+                        indicator.setAttribute('active', 'true');
+                    } else {
+                        panel.classList.add('hidden');
+                        indicator.setAttribute('active', 'false');
+                    }
+                }
+
+                const step5Label = modeIsNew ? '5. New Service Flow + Container' : '5. Existing Resources + Container';
+                const step5Indicator = this.querySelector('#wizardStepIndicator5');
+                if (step5Indicator) {
+                    step5Indicator.setAttribute('label', step5Label);
+                }
+
+                const step5Title = this.querySelector('#wizardStep5Title');
+                if (step5Title) {
+                    step5Title.textContent = modeIsNew
+                        ? 'Step 5 — New Service Flow + Container + Env'
+                        : 'Step 5 — Existing Service Resources + Container + Env';
+                }
+
+                const existingSection = this.querySelector('#wizardExistingServiceSection');
+                if (existingSection) {
+                    existingSection.classList.toggle('hidden', modeIsNew);
+                }
+
+                const newResourcesSection = this.querySelector('#wizardNewServiceResourcesSection');
+                if (newResourcesSection) {
+                    newResourcesSection.classList.toggle('hidden', !modeIsNew);
+                }
+
+                const prevBtn = this.querySelector('#wizardPrevBtn');
+                if (prevBtn) {
+                    prevBtn.classList.toggle('hidden', step <= 1);
+                }
+
+                const cancelBtn = this.querySelector('#wizardCancelBtn');
+                if (cancelBtn) {
+                    cancelBtn.classList.toggle('hidden', !editMode);
+                }
+
+                const nextBtn = this.querySelector('#wizardNextBtn');
+                const createBtn = this.querySelector('#wizardCreateBtn');
+                if (nextBtn && createBtn) {
+                    const isFinalStep = step >= 5;
+                    nextBtn.classList.toggle('hidden', isFinalStep);
+                    createBtn.classList.toggle('hidden', !isFinalStep);
+                }
+            }
+        }
+
+        if (!customElements.get('profile-wizard')) {
+            customElements.define('profile-wizard', ProfileWizard);
+        }
+
+        class WizardSubtitle extends HTMLElement {
+            static get observedAttributes() {
+                return ['text'];
+            }
+
+            connectedCallback() {
+                this.render();
+            }
+
+            attributeChangedCallback() {
+                this.render();
+            }
+
+            setSubtitle(value) {
+                this.setAttribute('text', String(value ?? ''));
+            }
+
+            render() {
+                const text = this.getAttribute('text') || '';
+                this.innerHTML = `<p class="text-sm text-gray-600 mt-1">${escapeHtml(text)}</p>`;
+            }
+        }
+
+        if (!customElements.get('wizard-subtitle')) {
+            customElements.define('wizard-subtitle', WizardSubtitle);
+        }
+
+        class WizardErrorBanner extends HTMLElement {
+            connectedCallback() {
+                if (!this.classList.contains('hidden')) {
+                    this.classList.add('hidden');
+                }
+                this.render('');
+            }
+
+            showMessage(message) {
+                this.render(String(message || 'Unknown error'));
+                this.classList.remove('hidden');
+            }
+
+            clearMessage() {
+                this.render('');
+                this.classList.add('hidden');
+            }
+
+            render(message) {
+                this.innerHTML = `<div class="text-sm text-red-600">${escapeHtml(String(message || ''))}</div>`;
+            }
+        }
+
+        if (!customElements.get('wizard-error-banner')) {
+            customElements.define('wizard-error-banner', WizardErrorBanner);
+        }
+
+        class OperationModal extends HTMLElement {
+            open() {
+                this.classList.remove('hidden');
+            }
+
+            close() {
+                this.classList.add('hidden');
+            }
+
+            isOpen() {
+                return !this.classList.contains('hidden');
+            }
+        }
+
+        if (!customElements.get('operation-modal')) {
+            customElements.define('operation-modal', OperationModal);
+        }
+
+        class ConfirmDialog extends HTMLElement {
+            open() {
+                this.classList.remove('hidden');
+            }
+
+            close() {
+                this.classList.add('hidden');
+            }
+
+            isOpen() {
+                return !this.classList.contains('hidden');
+            }
+        }
+
+        if (!customElements.get('confirm-dialog')) {
+            customElements.define('confirm-dialog', ConfirmDialog);
+        }
+
         function getStoredThemePreference() {
             try {
                 const value = localStorage.getItem('ecsAwsTheme');
@@ -929,9 +1467,9 @@
         }
 
         function updateDarkModeButton() {
-            if (!darkModeBtn || !darkModeIcon || !darkModeLabel) return;
-            darkModeIcon.className = darkModeEnabled ? 'fa-regular fa-sun' : 'fa-regular fa-moon';
-            darkModeLabel.textContent = darkModeEnabled ? 'Light' : 'Dark';
+            if (!darkModeBtn) return;
+            darkModeBtn.setAttribute('icon', darkModeEnabled ? 'fa-regular fa-sun' : 'fa-regular fa-moon');
+            darkModeBtn.setAttribute('label', darkModeEnabled ? 'Light' : 'Dark');
         }
 
         function applyTheme(enabled, persist = false) {
@@ -949,8 +1487,12 @@
         }
 
         function updateBodyScrollLock() {
-            const operationOpen = operationModal && !operationModal.classList.contains('hidden');
-            const dialogOpen = dialogModal && !dialogModal.classList.contains('hidden');
+            const operationOpen = operationModal && (typeof operationModal.isOpen === 'function'
+                ? operationModal.isOpen()
+                : !operationModal.classList.contains('hidden'));
+            const dialogOpen = dialogModal && (typeof dialogModal.isOpen === 'function'
+                ? dialogModal.isOpen()
+                : !dialogModal.classList.contains('hidden'));
             const wizardOpen = profileWizard && !profileWizard.classList.contains('hidden');
             const shouldLock = operationOpen || dialogOpen || wizardOpen;
 
@@ -1015,7 +1557,11 @@
                 return;
             }
 
-            if (operationModal.classList.contains('hidden')) {
+            const operationModalOpen = typeof operationModal.isOpen === 'function'
+                ? operationModal.isOpen()
+                : !operationModal.classList.contains('hidden');
+
+            if (!operationModalOpen) {
                 return;
             }
 
@@ -1024,29 +1570,37 @@
                 loadMoreOperationList();
             }
         });
-        wizardPrevBtn.addEventListener('click', () => goToWizardStep(wizardStep - 1));
-        wizardNextBtn.addEventListener('click', () => goToWizardStep(wizardStep + 1));
-        wizardCreateBtn.addEventListener('click', createProfileFromWizard);
-        wizardCancelBtn.addEventListener('click', closeWizardWithoutSaving);
-        wizardAddEnvBtn.addEventListener('click', () => addEnvRow('', ''));
+        if (wizardUi.prevBtn) {
+            wizardUi.prevBtn.addEventListener('click', () => goToWizardStep(wizardStep - 1));
+        }
+        if (wizardUi.nextBtn) {
+            wizardUi.nextBtn.addEventListener('click', () => goToWizardStep(wizardStep + 1));
+        }
+        if (wizardUi.createBtn) {
+            wizardUi.createBtn.addEventListener('click', createProfileFromWizard);
+        }
+        if (wizardUi.cancelBtn) {
+            wizardUi.cancelBtn.addEventListener('click', closeWizardWithoutSaving);
+        }
+        if (wizardUi.addEnvBtn) {
+            wizardUi.addEnvBtn.addEventListener('click', () => addEnvRow('', ''));
+        }
+        wizardEnvRows.addEventListener('wizard-env-change', updateWizardValidationUI);
+        wizardEnvRows.addEventListener('wizard-env-remove', (event) => {
+            const targetRow = event?.detail?.row;
+            if (targetRow && typeof targetRow.remove === 'function') {
+                targetRow.remove();
+            }
+
+            if (!wizardEnvRows.querySelector('[data-env-row]')) {
+                addEnvRow('', '');
+            }
+
+            updateWizardValidationUI();
+        });
         wizardCluster.addEventListener('change', () => loadWizardOptions(true));
         wizardNewCluster.addEventListener('change', () => loadWizardOptions(true));
         wizardServiceMode.addEventListener('change', onWizardServiceModeChanged);
-        wizardService.addEventListener('change', onWizardScheduleVisibilityChanged);
-        wizardScheduleCron.addEventListener('input', renderSchedulePreview);
-        wizardScheduleTimezone.addEventListener('input', renderSchedulePreview);
-        wizardScheduleType.addEventListener('change', () => {
-            if (wizardScheduleType.value === 'scheduler' && !wizardScheduleTimezone.value) {
-                wizardScheduleTimezone.value = browserTimeZone;
-            }
-            wizardScheduleTimezoneWrap.classList.toggle('hidden', wizardScheduleType.value !== 'scheduler');
-            renderSchedulePreview();
-            loadWizardScheduleRoles();
-        });
-        if (Intl.supportedValuesOf) {
-            wizardScheduleTimezoneList.innerHTML = Intl.supportedValuesOf('timeZone')
-                .map(zone => `<option value="${zone}"></option>`).join('');
-        }
         wizardAwsProfile.addEventListener('change', () => loadWizardOptions());
         wizardRegion.addEventListener('change', () => loadWizardOptions());
         wizardNewLoadBalancer.addEventListener('change', () => loadWizardNewServiceOptions(true));
@@ -1085,15 +1639,8 @@
                 const response = await fetch('/api/default-profile');
                 const data = await response.json();
 
-                const requestedProfile = new URLSearchParams(window.location.search).get('profile');
-                if (requestedProfile && (data.availableProfiles || []).includes(requestedProfile)) {
-                    data.defaultProfile = requestedProfile;
-                    data.profileExists = true;
-                }
-
                 if (data.defaultProfile) {
                     currentProfile = data.defaultProfile;
-                    loadServiceSwitcher();
 
                     // Update header with profile name, and show working directory as mouseover tooltip
                     profileHoverText = data.workingDirectory || '';
@@ -1125,44 +1672,18 @@
             }
         }
 
-        // Shows a dropdown instead of the service name when the directory holds several ECSConfigs
-        async function loadServiceSwitcher() {
-            try {
-                const response = await fetch('/api/services');
-                const services = await response.json();
-                if (!Array.isArray(services) || services.length < 2) {
-                    return;
-                }
-
-                serviceSwitcher.innerHTML = services.map(service => `
-                    <option value="${escapeHtml(service.profile)}" ${service.profile === currentProfile ? 'selected' : ''}>
-                        ${escapeHtml(service.serviceName)}${service.serviceName !== service.profile ? ` (${escapeHtml(service.profile)})` : ''}
-                    </option>
-                `).join('');
-                serviceSwitcher.classList.remove('hidden');
-                serviceName.querySelector('div').classList.add('hidden');
-            } catch (error) {
-                console.error('Failed to load services:', error);
-            }
-        }
-
-        serviceSwitcher.addEventListener('change', () => {
-            const url = new URL(window.location.href);
-            url.searchParams.set('profile', serviceSwitcher.value);
-            window.location.href = url.toString();
-        });
-
         async function showProfileCreationWizard(profile, options = {}) {
             const { prefillConfig = null, editMode = false } = options;
 
             wizardEditMode = !!editMode;
             wizardProfileName = profile || 'default';
             wizardConfigProfile.value = wizardProfileName;
-            wizardCreateBtn.textContent = wizardEditMode ? 'Save Configuration' : 'Create Profile';
+            if (wizardUi.createBtn) {
+                wizardUi.createBtn.setAttribute('label', wizardEditMode ? 'Save Configuration' : 'Create Profile');
+            }
             profileWizard.classList.remove('hidden');
             updateBodyScrollLock();
-            wizardError.classList.add('hidden');
-            wizardError.textContent = '';
+            clearWizardError();
             wizardStep = 1;
             renderWizardStep();
             wizardEnvRows.innerHTML = '';
@@ -1180,11 +1701,6 @@
             wizardAppPort.value = 8080;
             wizardLocalPort.value = 8080;
             wizardServiceMode.value = 'existing';
-            wizardScheduleType.value = 'rule';
-            wizardScheduleTimezone.value = '';
-            wizardScheduleCron.value = '0 3 * * ? *';
-            wizardScheduleRoleArn = '';
-            wizardScheduleSection.classList.add('hidden');
 
             try {
                 const response = await fetch(`/api/wizard/bootstrap/${encodeURIComponent(wizardProfileName)}`);
@@ -1214,8 +1730,7 @@
                 await checkDockerfilePreview();
                 updateWizardValidationUI();
             } catch (error) {
-                wizardError.textContent = error.message;
-                wizardError.classList.remove('hidden');
+                setWizardError(error.message);
             }
         }
 
@@ -1249,13 +1764,6 @@
 
             if (!isNewServiceMode) {
                 wizardService.value = safeConfig.service || '__cronjob__';
-                const schedule = safeConfig.schedule || {};
-                wizardScheduleType.value = schedule.type === 'scheduler' ? 'scheduler' : 'rule';
-                wizardScheduleTimezone.value = schedule.timezone && schedule.timezone !== 'UTC' ? schedule.timezone : '';
-                wizardScheduleCron.value = schedule.cron || wizardScheduleCron.value;
-                wizardScheduleRoleArn = schedule.role_arn || '';
-                wizardScheduleSection.classList.add('hidden');
-                onWizardScheduleVisibilityChanged();
             }
 
             if (isNewServiceMode) {
@@ -1302,8 +1810,32 @@
         function closeWizardWithoutSaving() {
             profileWizard.classList.add('hidden');
             wizardEditMode = false;
-            wizardCreateBtn.textContent = 'Create Profile';
+            if (wizardUi.createBtn) {
+                wizardUi.createBtn.setAttribute('label', 'Create Profile');
+            }
             updateBodyScrollLock();
+        }
+
+        function clearWizardError() {
+            const errorBanner = wizardUi.error;
+            if (!errorBanner) return;
+            if (typeof errorBanner.clearMessage === 'function') {
+                errorBanner.clearMessage();
+                return;
+            }
+            errorBanner.classList.add('hidden');
+            errorBanner.textContent = '';
+        }
+
+        function setWizardError(message) {
+            const errorBanner = wizardUi.error;
+            if (!errorBanner) return;
+            if (typeof errorBanner.showMessage === 'function') {
+                errorBanner.showMessage(message);
+                return;
+            }
+            errorBanner.textContent = String(message || 'Unknown error');
+            errorBanner.classList.remove('hidden');
         }
 
         async function checkDockerfilePreview() {
@@ -1356,59 +1888,23 @@
                     ? 'Provide new service resource details and container settings to match the new-service flow.'
                     : 'Select existing resources and configure container settings before creating the profile.',
             };
-
-            if (wizardSubtitle) {
-                wizardSubtitle.textContent = stepSubtitles[wizardStep] || stepSubtitles[1];
-            }
-
-            for (let step = 1; step <= 5; step += 1) {
-                const panel = document.getElementById(`wizardStep${step}`);
-                const indicator = document.getElementById(`wizardStepIndicator${step}`);
-                if (!panel || !indicator) continue;
-
-                if (step === wizardStep) {
-                    panel.classList.remove('hidden');
-                    indicator.className = 'px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-medium text-center';
-                } else {
-                    panel.classList.add('hidden');
-                    indicator.className = 'px-2 py-1 rounded bg-gray-100 text-gray-600 text-center';
-                }
-            }
-
             const modeIsNew = wizardServiceMode.value === 'new';
-            const step5Label = modeIsNew ? '5. New Service Flow + Container' : '5. Existing Resources + Container';
-            const step5Indicator = document.getElementById('wizardStepIndicator5');
-            if (step5Indicator) {
-                step5Indicator.textContent = step5Label;
-            }
-            if (wizardStep5Title) {
-                wizardStep5Title.textContent = modeIsNew
-                    ? 'Step 5 — New Service Flow + Container + Env'
-                    : 'Step 5 — Existing Service Resources + Container + Env';
-            }
-            if (wizardExistingServiceSection) {
-                wizardExistingServiceSection.classList.toggle('hidden', modeIsNew);
-            }
-            if (wizardNewServiceResourcesSection) {
-                wizardNewServiceResourcesSection.classList.toggle('hidden', !modeIsNew);
+
+            if (profileWizard && typeof profileWizard.applyWizardState === 'function') {
+                profileWizard.applyWizardState({
+                    step: wizardStep,
+                    subtitle: stepSubtitles[wizardStep] || stepSubtitles[1],
+                    modeIsNew,
+                    editMode: wizardEditMode,
+                });
+                return;
             }
 
-            if (wizardStep <= 1) {
-                wizardPrevBtn.classList.add('hidden');
-            } else {
-                wizardPrevBtn.classList.remove('hidden');
-            }
-
-            if (wizardCancelBtn) {
-                wizardCancelBtn.classList.toggle('hidden', !wizardEditMode);
-            }
-
-            if (wizardStep >= 5) {
-                wizardNextBtn.classList.add('hidden');
-                wizardCreateBtn.classList.remove('hidden');
-            } else {
-                wizardNextBtn.classList.remove('hidden');
-                wizardCreateBtn.classList.add('hidden');
+            const fallbackSubtitle = profileWizard
+                ? profileWizard.querySelector('#wizardSubtitle')
+                : null;
+            if (fallbackSubtitle) {
+                fallbackSubtitle.textContent = stepSubtitles[wizardStep] || stepSubtitles[1];
             }
         }
 
@@ -1504,11 +2000,6 @@
                 if (!isNonNegativeInteger(wizardHostPort.value)) return 'Host port must be a non-negative integer.';
                 if (!isNonNegativeInteger(wizardAppPort.value)) return 'App port must be a non-negative integer.';
                 if (!isNonNegativeInteger(wizardLocalPort.value)) return 'Local port must be a non-negative integer.';
-                if (isWizardCronjob()) {
-                    const scheduleError = renderSchedulePreview();
-                    if (scheduleError) return scheduleError;
-                    if (!wizardScheduleRole.value) return 'An IAM role is required for the schedule.';
-                }
 
                 if (isNewServiceMode) {
                     if (!(wizardNewServiceName.value || '').trim()) return 'Service name is required for new service flow.';
@@ -1523,91 +2014,9 @@
             return null;
         }
 
-        function isWizardCronjob() {
-            return wizardServiceMode.value !== 'new' && wizardService.value === '__cronjob__';
-        }
-
-        function getWizardScheduleTimezone() {
-            return wizardScheduleType.value === 'scheduler' ? ((wizardScheduleTimezone.value || '').trim() || 'UTC') : 'UTC';
-        }
-
-        // Validates the cron and lists the next 5 runs; returns the error message, if any
-        function renderSchedulePreview() {
-            const timeZone = getWizardScheduleTimezone();
-            if (!ecsCron.isValidTimeZone(timeZone)) {
-                wizardSchedulePreview.innerHTML = `<li class="text-red-600">Unknown timezone "${escapeHtml(timeZone)}"</li>`;
-                return `Unknown timezone "${timeZone}".`;
-            }
-            const result = ecsCron.preview(wizardScheduleCron.value, 5, { timeZone });
-            if (result.error) {
-                wizardSchedulePreview.innerHTML = `<li class="text-red-600">${escapeHtml(result.error)}</li>`;
-                return `Cron expression: ${result.error}`;
-            }
-            wizardSchedulePreview.innerHTML = result.runs.map((date) => {
-                const local = browserTimeZone !== timeZone
-                    ? ` <span class="text-gray-500">(${escapeHtml(ecsCron.formatInZone(date, browserTimeZone))} local)</span>`
-                    : '';
-                return `<li>${escapeHtml(ecsCron.formatInZone(date, timeZone))}${local}</li>`;
-            }).join('');
-            return null;
-        }
-
-        async function loadWizardScheduleRoles() {
-            const preferred = wizardScheduleRole.value && !wizardScheduleRole.value.startsWith('__') ? wizardScheduleRole.value : wizardScheduleRoleArn;
-            const roleName = `ecs-aws-${wizardScheduleType.value === 'scheduler' ? 'scheduler' : 'events'}-role`;
-            let roles = [];
-            try {
-                const query = new URLSearchParams({
-                    awsProfile: wizardAwsProfile.value || 'default',
-                    region: wizardRegion.value || 'eu-west-1',
-                    type: wizardScheduleType.value,
-                }).toString();
-                const response = await fetch(`/api/wizard/schedule-roles?${query}`);
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to load IAM roles');
-                }
-                roles = data.roles || [];
-            } catch (error) {
-                console.error('Failed to load schedule roles:', error);
-            }
-            const options = roles.map(role => ({ label: role.name, value: role.arn }));
-            if (preferred && !roles.some(role => role.arn === preferred)) {
-                options.unshift({ label: preferred, value: preferred });
-            }
-            options.push({ label: `Create a new role (${roleName})`, value: '__create__' });
-            populateSelect(wizardScheduleRole, options, preferred || (roles[0] && roles[0].arn) || '__create__');
-        }
-
-        function onWizardScheduleVisibilityChanged() {
-            const show = isWizardCronjob();
-            const wasHidden = wizardScheduleSection.classList.contains('hidden');
-            wizardScheduleSection.classList.toggle('hidden', !show);
-            wizardScheduleTimezoneWrap.classList.toggle('hidden', wizardScheduleType.value !== 'scheduler');
-            if (show) {
-                renderSchedulePreview();
-                if (wasHidden) {
-                    loadWizardScheduleRoles();
-                }
-            }
-        }
-
-        function getWizardSchedulePayload() {
-            if (!isWizardCronjob()) {
-                return null;
-            }
-            return {
-                type: wizardScheduleType.value,
-                cron: (wizardScheduleCron.value || '').trim(),
-                timezone: getWizardScheduleTimezone(),
-                role_arn: wizardScheduleRole.value,
-            };
-        }
-
         function onWizardServiceModeChanged() {
             const isNewServiceMode = wizardServiceMode.value === 'new';
             wizardNewServiceSection.classList.toggle('hidden', !isNewServiceMode);
-            onWizardScheduleVisibilityChanged();
             if (wizardStep >= 4) {
                 renderWizardStep();
             }
@@ -1650,56 +2059,26 @@
 
                 updateWizardValidationUI();
             } catch (error) {
-                wizardError.textContent = error.message;
-                wizardError.classList.remove('hidden');
+                setWizardError(error.message);
             }
         }
 
         function goToWizardStep(nextStep) {
             const validationError = validateWizardStep(wizardStep);
             if (nextStep > wizardStep && validationError) {
-                wizardError.textContent = validationError;
-                wizardError.classList.remove('hidden');
+                setWizardError(validationError);
                 return;
             }
 
-            wizardError.classList.add('hidden');
-            wizardError.textContent = '';
+            clearWizardError();
             wizardStep = Math.max(1, Math.min(5, nextStep));
             renderWizardStep();
         }
 
         function addEnvRow(key = '', value = '') {
-            const row = document.createElement('div');
-            row.setAttribute('data-env-row', 'true');
-            row.className = 'border border-gray-200 rounded-md p-3';
-            row.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
-                    <input data-env-key type="text" placeholder="Key"
-                        class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(key)}" />
-                    <input data-env-value type="text" placeholder="Value"
-                        class="md:col-span-5 px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900" value="${escapeHtml(value)}" />
-                    <div class="md:col-span-2 flex items-center justify-end gap-2">
-                        <i data-env-check class="fa-solid fa-check text-green-600 hidden"></i>
-                        <button data-env-remove class="inline-flex items-center px-2 py-1 rounded text-xs border border-gray-300 text-gray-700 hover:bg-gray-50">Remove</button>
-                    </div>
-                </div>
-            `;
-
-            const keyInput = row.querySelector('[data-env-key]');
-            const valueInput = row.querySelector('[data-env-value]');
-            const removeButton = row.querySelector('[data-env-remove]');
-
-            keyInput.addEventListener('input', updateWizardValidationUI);
-            valueInput.addEventListener('input', updateWizardValidationUI);
-            removeButton.addEventListener('click', () => {
-                row.remove();
-                if (!wizardEnvRows.querySelector('[data-env-row]')) {
-                    addEnvRow('', '');
-                }
-                updateWizardValidationUI();
-            });
-
+            const row = document.createElement('wizard-env-row');
+            row.envKey = key;
+            row.envValue = value;
             wizardEnvRows.appendChild(row);
             updateWizardValidationUI();
         }
@@ -1723,8 +2102,7 @@
         }
 
         async function loadWizardOptions(servicesOnly = false) {
-            wizardError.classList.add('hidden');
-            wizardError.textContent = '';
+            clearWizardError();
 
             try {
                 const awsProfile = wizardAwsProfile.value || 'default';
@@ -1762,8 +2140,7 @@
 
                 updateWizardValidationUI();
             } catch (error) {
-                wizardError.textContent = error.message;
-                wizardError.classList.remove('hidden');
+                setWizardError(error.message);
             }
         }
 
@@ -1772,10 +2149,15 @@
             const env = [];
 
             rows.forEach((row) => {
-                const keyInput = row.querySelector('[data-env-key]');
-                const valueInput = row.querySelector('[data-env-value]');
-                const key = (keyInput.value || '').trim();
-                const value = (valueInput.value || '').trim();
+                const pair = typeof row.getPair === 'function'
+                    ? row.getPair()
+                    : {
+                        key: ((row.querySelector('[data-env-key]') || {}).value || '').trim(),
+                        value: ((row.querySelector('[data-env-value]') || {}).value || '').trim(),
+                    };
+
+                const key = pair.key;
+                const value = pair.value;
                 if (key && value) {
                     env.push({ name: key, value });
                 }
@@ -1785,13 +2167,11 @@
         }
 
         async function createProfileFromWizard() {
-            wizardError.classList.add('hidden');
-            wizardError.textContent = '';
+            clearWizardError();
 
             const stepError = validateWizardStep(5);
             if (stepError) {
-                wizardError.textContent = stepError;
-                wizardError.classList.remove('hidden');
+                setWizardError(stepError);
                 return;
             }
 
@@ -1813,8 +2193,7 @@
 
             const missing = requiredValues.find(item => !item.value);
             if (missing) {
-                wizardError.textContent = `${missing.key} is required.`;
-                wizardError.classList.remove('hidden');
+                setWizardError(`${missing.key} is required.`);
                 return;
             }
 
@@ -1833,7 +2212,6 @@
                 app_port: wizardAppPort.value,
                 local_port: wizardLocalPort.value,
                 env: parseWizardEnv(),
-                schedule: getWizardSchedulePayload(),
                 newService: isNewServiceMode ? {
                     serviceName: (wizardNewServiceName.value || '').trim(),
                     app_port: Number(wizardNewAppPort.value),
@@ -1860,17 +2238,15 @@
 
                 profileWizard.classList.add('hidden');
                 updateBodyScrollLock();
-                const scheduleNote = result.schedule ? ` ${result.schedule.message || result.schedule.warning}` : '';
-                showSuccess((wizardEditMode
+                showSuccess(wizardEditMode
                     ? `Profile ${wizardProfileName} updated successfully.`
-                    : `Profile ${wizardProfileName} created successfully.`) + scheduleNote);
+                    : `Profile ${wizardProfileName} created successfully.`);
 
                 await loadServiceInfo();
                 startDashboardAutoRefresh();
                 mainContent.classList.remove('hidden');
             } catch (error) {
-                wizardError.textContent = error.message;
-                wizardError.classList.remove('hidden');
+                setWizardError(error.message);
             }
         }
 
@@ -1895,7 +2271,9 @@
         document.addEventListener('keydown', (event) => {
             const key = String(event.key || '').toLowerCase();
             const tailIsActive = stopTailBtn && !stopTailBtn.classList.contains('hidden');
-            const operationModalOpen = operationModal && !operationModal.classList.contains('hidden');
+            const operationModalOpen = operationModal && (typeof operationModal.isOpen === 'function'
+                ? operationModal.isOpen()
+                : !operationModal.classList.contains('hidden'));
 
             if (key === 'escape' && operationModalOpen) {
                 event.preventDefault();
@@ -2027,11 +2405,11 @@
         }
 
         function setRefreshLoading(loading) {
-            if (!refreshIcon) return;
+            if (!refreshBtn) return;
             if (loading) {
-                refreshIcon.classList.add('fa-spin');
+                refreshBtn.setAttribute('loading', '');
             } else {
-                refreshIcon.classList.remove('fa-spin');
+                refreshBtn.removeAttribute('loading');
             }
         }
 
@@ -2075,13 +2453,11 @@
                 renderMetricChart(memoryMetricChart, dashboard.metrics?.memory || []);
                 renderAdvancedMetrics(dashboard.advancedMetrics || {});
 
-                const typeLabel = dashboard.type === 'scheduled-task' ? 'Scheduled Task' : 'ECS Service';
-                const typeClass = dashboard.type === 'scheduled-task'
-                    ? 'bg-purple-100 text-purple-800'
-                    : 'bg-green-100 text-green-800';
                 if (serviceTypeLabel) {
-                    serviceTypeLabel.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${typeClass}`;
-                    serviceTypeLabel.textContent = typeLabel;
+                    serviceTypeLabel.innerHTML = '';
+                    const typeBadge = document.createElement('service-type-badge');
+                    typeBadge.setAttribute('service-type', dashboard.type === 'scheduled-task' ? 'scheduled-task' : 'ecs-service');
+                    serviceTypeLabel.appendChild(typeBadge);
                 }
             } catch (error) {
                 showActionError('Failed to load dashboard areas: ' + error.message);
@@ -2103,22 +2479,12 @@
         }
 
         function createAdvancedMetricCard(title, value, subtitle = '', tone = 'neutral') {
-            const toneClassMap = {
-                good: 'text-green-700 bg-green-50 border-green-200',
-                warn: 'text-yellow-700 bg-yellow-50 border-yellow-200',
-                bad: 'text-red-700 bg-red-50 border-red-200',
-                neutral: 'text-gray-900 bg-gray-50 border-gray-200',
-            };
-
-            const toneClass = toneClassMap[tone] || toneClassMap.neutral;
-
-            return `
-                <div class="border rounded-lg p-4 ${toneClass}">
-                    <div class="text-xs uppercase tracking-wide opacity-80 mb-1">${escapeHtml(title)}</div>
-                    <div class="text-lg font-semibold">${escapeHtml(String(value))}</div>
-                    <div class="text-xs mt-1 opacity-80 whitespace-pre-wrap">${escapeHtml(subtitle)}</div>
-                </div>
-            `;
+            const card = document.createElement('advanced-metric-card');
+            card.setAttribute('title', String(title ?? ''));
+            card.setAttribute('value', String(value ?? ''));
+            card.setAttribute('subtitle', String(subtitle ?? ''));
+            card.setAttribute('tone', String(tone ?? 'neutral'));
+            return card;
         }
 
         function renderAdvancedMetrics(advancedMetrics) {
@@ -2196,7 +2562,8 @@
                 ),
             ];
 
-            advancedMetricsGrid.innerHTML = cards.join('');
+            advancedMetricsGrid.innerHTML = '';
+            cards.forEach((card) => advancedMetricsGrid.appendChild(card));
         }
 
         function renderResourceDetails(details) {
@@ -2563,150 +2930,8 @@
             };
         }
 
-        // Hides what only applies to long-running services (scale, force deploy, events, metrics)
-        function applyServiceTypeLayout(isScheduledTask) {
-            [forceDeployBtn, scaleBtn, eventsBtn,
-                document.getElementById('serviceEventsCard'),
-                document.getElementById('metricsCard'),
-                document.getElementById('advancedMetricsCard'),
-            ].forEach(element => element && element.classList.toggle('hidden', isScheduledTask));
-            document.getElementById('dashboardGrid').classList.toggle('lg:grid-cols-2', !isScheduledTask);
-            document.getElementById('overviewTitle').textContent = isScheduledTask ? 'Scheduled Task' : 'Service Overview';
-            document.getElementById('logsCardTitle').textContent = isScheduledTask ? 'Logs' : 'Logs & Events';
-            if (deleteBtn) {
-                deleteBtn.querySelector('span').textContent = isScheduledTask ? 'Delete Scheduled Task' : 'Delete Service';
-            }
-        }
-
-        function formatRelativeFuture(date) {
-            const minutes = Math.round((new Date(date).getTime() - Date.now()) / 60000);
-            if (minutes < 1) return 'in less than a minute';
-            const days = Math.floor(minutes / 1440);
-            const hours = Math.floor((minutes % 1440) / 60);
-            const mins = minutes % 60;
-            const parts = [];
-            if (days) parts.push(`${days}d`);
-            if (hours) parts.push(`${hours}h`);
-            if (mins && !days) parts.push(`${mins}m`);
-            return `in ${parts.join(' ')}`;
-        }
-
-        let nextRunTicker = null;
-
-        function displayScheduledTaskInfo(info) {
-            const config = info.config || {};
-            const schedule = info.schedule || {};
-            const timeZone = schedule.timezone || 'UTC';
-            const preview = schedule.expression ? ecsCron.preview(schedule.expression, 5, { timeZone }) : { error: 'No schedule configured' };
-            const runs = preview.runs || [];
-            const isActive = schedule.exists && schedule.state === 'ENABLED';
-            const typeLabel = schedule.type === 'scheduler' ? 'EventBridge Scheduler' : (schedule.type === 'rule' ? 'EventBridge rule' : 'N/A');
-            const badgeClass = isActive ? 'bg-purple-100 text-purple-800' : 'bg-yellow-100 text-yellow-800';
-            const badgeIcon = isActive ? 'fa-regular fa-clock' : 'fa-solid fa-triangle-exclamation';
-
-            serviceName.querySelector('div').textContent = info.serviceName || 'N/A';
-            serviceName.classList.remove('hidden');
-            serviceStatus.innerHTML = `
-                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeClass}">
-                    <i class="${badgeIcon}"></i>
-                    ${escapeHtml(info.status || 'Unknown')}
-                </span>
-            `;
-            serviceStatus.classList.remove('hidden');
-            if (topActionButtons) {
-                topActionButtons.classList.remove('hidden');
-            }
-
-            let scheduleNote = '';
-            if (schedule.error) {
-                scheduleNote = `Could not read the schedule from AWS: ${schedule.error}`;
-            } else if (!schedule.expression) {
-                scheduleNote = 'No schedule configured. Use Edit Configuration to add one.';
-            } else if (!schedule.exists) {
-                scheduleNote = 'The schedule is in the config but not created in AWS yet. It is created on the next deploy.';
-            } else if (!isActive) {
-                scheduleNote = 'The schedule is disabled in AWS: the runs below will not happen.';
-            }
-
-            const nextRunsList = runs.length
-                ? runs.map((date, index) => `
-                    <li class="flex items-baseline justify-between gap-4 ${index === 0 ? 'font-semibold text-gray-900' : 'text-gray-700'}">
-                        <span class="font-mono">${escapeHtml(ecsCron.formatInZone(date, timeZone))}</span>
-                        <span class="text-xs text-gray-500 whitespace-nowrap">${escapeHtml(browserTimeZone !== timeZone ? `${ecsCron.formatInZone(date, browserTimeZone)} local` : formatRelativeFuture(date))}</span>
-                    </li>`).join('')
-                : `<li class="text-sm text-gray-500">${escapeHtml(preview.error || 'No upcoming runs')}</li>`;
-
-            serviceInfo.innerHTML = `
-                <div class="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="bg-purple-50 border border-purple-100 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Next Run</div>
-                        <div class="text-2xl font-semibold text-gray-900" data-next-run="${runs[0] ? runs[0].toISOString() : ''}">${runs[0] ? escapeHtml(formatRelativeFuture(runs[0])) : 'N/A'}</div>
-                        <div class="text-sm text-gray-600 mt-1">${runs[0] ? escapeHtml(ecsCron.formatInZone(runs[0], timeZone)) : ''}</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Cron</div>
-                        <div class="font-mono font-medium text-gray-900 break-all">${escapeHtml(schedule.expression || 'N/A')}</div>
-                        <div class="text-xs text-gray-500 mt-1">${escapeHtml(typeLabel)} · ${escapeHtml(timeZone)}${schedule.name ? ` · ${escapeHtml(schedule.name)}` : ''}</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Last Log Activity</div>
-                        <div class="font-medium text-gray-900">${formatDashboardDateTime(info.lastLogEventAt)}</div>
-                    </div>
-                </div>
-                ${scheduleNote ? `<div class="md:col-span-3 text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2">${escapeHtml(scheduleNote)}</div>` : ''}
-                <div class="md:col-span-2 bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-2">Next 5 Runs</div>
-                    <ol class="space-y-1 text-sm">${nextRunsList}</ol>
-                </div>
-                <div class="space-y-4">
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Task Definition</div>
-                        <div class="font-medium text-gray-900 truncate">
-                            ${escapeHtml(info.taskDefinition || 'N/A')}
-                            ${info.taskDefinitionVersion && info.taskDefinitionVersion !== 'N/A'
-                    ? `<span class="ml-2 text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">v${escapeHtml(info.taskDefinitionVersion)}</span>`
-                    : ''}
-                        </div>
-                        ${schedule.runsRevision && schedule.runsRevision !== 'latest' && schedule.runsRevision !== info.taskDefinitionVersion
-                    ? `<div class="text-xs text-yellow-700 mt-1">Schedule runs v${escapeHtml(schedule.runsRevision)}. Deploy to update it.</div>`
-                    : ''}
-                        <div class="text-xs text-gray-500 mt-1">Last deployed ${formatDashboardDateTime(info.lastDeploymentAt)}</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Memory / CPU</div>
-                        <div class="font-medium text-gray-900">${escapeHtml(String(config.container_memory ?? 'N/A'))} MB / ${escapeHtml(String(config.cpu_units ?? 'N/A'))} units</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-4">
-                        <div class="text-sm text-gray-500 mb-1">Dockerfile · AWS Profile</div>
-                        <div class="font-medium text-gray-900 break-all">${escapeHtml(String(config.dockerfile || 'N/A'))} · ${escapeHtml(String(config.profile || 'default'))}</div>
-                    </div>
-                </div>
-            `;
-
-            if (nextRunTicker) clearInterval(nextRunTicker);
-            nextRunTicker = setInterval(() => {
-                const element = serviceInfo.querySelector('[data-next-run]');
-                if (!element || !element.dataset.nextRun) return;
-                if (new Date(element.dataset.nextRun).getTime() <= Date.now()) {
-                    displayScheduledTaskInfo(info);
-                    return;
-                }
-                element.textContent = formatRelativeFuture(element.dataset.nextRun);
-            }, 30000);
-        }
-
         function displayServiceInfo(info) {
             if (!serviceName || !serviceStatus || !serviceInfo) return;
-            const isScheduledTask = info.type === 'scheduled-task';
-            applyServiceTypeLayout(isScheduledTask);
-            if (isScheduledTask) {
-                displayScheduledTaskInfo(info);
-                return;
-            }
-            if (nextRunTicker) {
-                clearInterval(nextRunTicker);
-                nextRunTicker = null;
-            }
             const config = info.config || {};
             const healthVisual = getServiceHealthVisual(info);
             const serviceModeLabel = config.new_service ? 'New Service' : 'Existing Service';
@@ -2724,12 +2949,12 @@
             serviceName.classList.remove('hidden');
 
             const status = info.status || 'Unknown';
-            serviceStatus.innerHTML = `
-                <span class="${healthVisual.badgeClass}">
-                    <i class="${healthVisual.iconClass}"></i>
-                    ${escapeHtml(healthVisual.label)}
-                </span>
-            `;
+            serviceStatus.innerHTML = '';
+            const healthBadge = document.createElement('service-health-badge');
+            healthBadge.setAttribute('badge-class', healthVisual.badgeClass);
+            healthBadge.setAttribute('icon-class', healthVisual.iconClass);
+            healthBadge.setAttribute('label', healthVisual.label);
+            serviceStatus.appendChild(healthBadge);
             serviceStatus.classList.remove('hidden');
 
             const isDeployed = String(status).toLowerCase() !== 'not deployed';
@@ -2738,60 +2963,21 @@
             }
 
             // Update service overview
-            serviceInfo.innerHTML = `
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Task Definition</div>
-                    <div class="font-medium text-gray-900 truncate">
-                        ${info.taskDefinition || 'N/A'}
-                        ${info.taskDefinitionVersion && info.taskDefinitionVersion !== 'N/A'
-                    ? `<span class="ml-2 text-xs font-semibold text-gray-600 bg-gray-200 px-2 py-0.5 rounded">v${escapeHtml(info.taskDefinitionVersion)}</span>`
-                    : ''}
-                    </div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Running / Desired</div>
-                    <div class="font-medium ${healthVisual.valueClass} flex items-center gap-2">
-                        <i class="${healthVisual.iconClass}"></i>
-                        <span>${info.runningCount || 0} / ${info.desiredCount || 0}</span>
-                    </div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Pending Tasks</div>
-                    <div class="font-medium text-gray-900">${info.pendingCount || 0}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Created</div>
-                    <div class="font-medium text-gray-900">${formatDateTime(info.createdAt)}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Last Deployment</div>
-                    <div class="font-medium text-gray-900">${formatDashboardDateTime(info.lastDeploymentAt)}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">AWS Profile</div>
-                    <div class="font-medium text-gray-900">${escapeHtml(String(awsProfile))}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Container Memory</div>
-                    <div class="font-medium text-gray-900">${escapeHtml(String(containerMemory))}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">CPU Units</div>
-                    <div class="font-medium text-gray-900">${escapeHtml(String(cpuUnits))}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Ports (App / Host / Local)</div>
-                    <div class="font-medium text-gray-900">${escapeHtml(String(appPort))} / ${escapeHtml(String(hostPortDisplay))} / ${escapeHtml(String(localPort))}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Dockerfile</div>
-                    <div class="font-medium text-gray-900 break-all">${escapeHtml(String(dockerfilePath))}</div>
-                </div>
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <div class="text-sm text-gray-500 mb-1">Service Mode</div>
-                    <div class="font-medium text-gray-900">${escapeHtml(serviceModeLabel)}</div>
-                </div>
-            `;
+            serviceInfo.innerHTML = '';
+            const overviewGrid = document.createElement('service-overview-grid');
+            overviewGrid.data = {
+                info,
+                healthVisual,
+                serviceModeLabel,
+                awsProfile,
+                containerMemory,
+                cpuUnits,
+                appPort,
+                hostPortDisplay,
+                localPort,
+                dockerfilePath,
+            };
+            serviceInfo.appendChild(overviewGrid);
         }
 
         async function deployService() {
@@ -3240,12 +3426,20 @@
             operationTitle.textContent = title;
             operationForm.classList.add('hidden');
             operationForm.innerHTML = '';
-            operationModal.classList.remove('hidden');
+            if (typeof operationModal.open === 'function') {
+                operationModal.open();
+            } else {
+                operationModal.classList.remove('hidden');
+            }
             updateBodyScrollLock();
         }
 
         function closeOperationModal() {
-            operationModal.classList.add('hidden');
+            if (typeof operationModal.close === 'function') {
+                operationModal.close();
+            } else {
+                operationModal.classList.add('hidden');
+            }
             operationListMode = null;
             operationListOffset = 0;
             operationListHasMore = false;
@@ -3261,28 +3455,16 @@
             dialogFields.innerHTML = '';
 
             fields.forEach((field, index) => {
-                const wrapper = document.createElement('div');
-                const inputId = `dialog-field-${field.name}`;
-                const fieldType = field.type === 'number' ? 'number' : 'text';
-
-                wrapper.innerHTML = `
-                    <label for="${inputId}" class="block text-sm font-medium text-gray-700 mb-1">${escapeHtml(field.label || field.name)}</label>
-                    <input
-                        id="${inputId}"
-                        data-dialog-field="${escapeHtml(field.name)}"
-                        type="${fieldType}"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        value="${escapeHtml(field.value ?? '')}"
-                        ${field.placeholder ? `placeholder="${escapeHtml(field.placeholder)}"` : ''}
-                        ${field.min !== undefined ? `min="${escapeHtml(field.min)}"` : ''}
-                    />
-                `;
-
-                dialogFields.appendChild(wrapper);
+                const inputComponent = document.createElement('dialog-field-input');
+                inputComponent.fieldData = field;
+                dialogFields.appendChild(inputComponent);
 
                 if (index === 0) {
-                    const input = wrapper.querySelector('input');
-                    setTimeout(() => input && input.focus(), 0);
+                    setTimeout(() => {
+                        if (typeof inputComponent.focusInput === 'function') {
+                            inputComponent.focusInput();
+                        }
+                    }, 0);
                 }
             });
         }
@@ -3299,7 +3481,11 @@
 
         function closeDialog(confirmed) {
             if (!dialogResolver) {
-                dialogModal.classList.add('hidden');
+                if (typeof dialogModal.close === 'function') {
+                    dialogModal.close();
+                } else {
+                    dialogModal.classList.add('hidden');
+                }
                 updateBodyScrollLock();
                 return;
             }
@@ -3319,7 +3505,11 @@
 
             dialogResolver = null;
             activeDialogConfig = null;
-            dialogModal.classList.add('hidden');
+            if (typeof dialogModal.close === 'function') {
+                dialogModal.close();
+            } else {
+                dialogModal.classList.add('hidden');
+            }
             dialogError.classList.add('hidden');
             dialogError.textContent = '';
             updateBodyScrollLock();
@@ -3345,19 +3535,18 @@
 
                 dialogTitle.textContent = title;
                 dialogMessage.textContent = message;
-                dialogConfirmBtn.textContent = confirmText;
-                dialogCancelBtn.textContent = cancelText;
+                dialogConfirmBtn.setAttribute('label', confirmText);
+                dialogCancelBtn.setAttribute('label', cancelText);
                 dialogError.classList.add('hidden');
                 dialogError.textContent = '';
-
-                if (danger) {
-                    dialogConfirmBtn.className = 'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700';
-                } else {
-                    dialogConfirmBtn.className = 'inline-flex items-center px-3 py-2 rounded-md text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700';
-                }
+                dialogConfirmBtn.setAttribute('variant', danger ? 'danger' : 'primary');
 
                 renderDialogFields(fields);
-                dialogModal.classList.remove('hidden');
+                if (typeof dialogModal.open === 'function') {
+                    dialogModal.open();
+                } else {
+                    dialogModal.classList.remove('hidden');
+                }
                 updateBodyScrollLock();
 
                 if (fields.length === 0) {
@@ -3372,7 +3561,10 @@
 
         dialogConfirmBtn.addEventListener('click', () => closeDialog(true));
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !dialogModal.classList.contains('hidden')) {
+            const dialogOpen = typeof dialogModal.isOpen === 'function'
+                ? dialogModal.isOpen()
+                : !dialogModal.classList.contains('hidden');
+            if (event.key === 'Escape' && dialogOpen) {
                 closeDialog(false);
             }
         });
@@ -3571,10 +3763,12 @@
             const buttons = [deployBtn, forceDeployBtn, scaleBtn, logsBtn, eventsBtn, tailBtn, deleteBtn].filter(Boolean);
             buttons.forEach(btn => {
                 btn.disabled = loading;
-                if (loading) {
-                    btn.classList.add('opacity-50', 'cursor-not-allowed');
-                } else {
-                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                if (btn instanceof HTMLButtonElement) {
+                    if (loading) {
+                        btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    } else {
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
                 }
             });
         }
@@ -3599,28 +3793,9 @@
                 return;
             }
 
-            const styleMap = {
-                success: {
-                    box: 'bg-green-50 border-green-200 text-green-800',
-                    icon: 'fa-circle-check text-green-600',
-                },
-                error: {
-                    box: 'bg-red-50 border-red-200 text-red-800',
-                    icon: 'fa-circle-exclamation text-red-600',
-                },
-                info: {
-                    box: 'bg-blue-50 border-blue-200 text-blue-800',
-                    icon: 'fa-circle-info text-blue-600',
-                },
-            };
-
-            const selected = styleMap[type] || styleMap.info;
-            const toast = document.createElement('div');
-            toast.className = `pointer-events-auto border rounded-md shadow-lg px-3 py-2 text-sm flex items-start gap-2 transition-opacity duration-200 ${selected.box}`;
-            toast.innerHTML = `
-                <i class="fa-solid ${selected.icon} mt-0.5"></i>
-                <div class="flex-1 break-words">${escapeHtml(String(message || ''))}</div>
-            `;
+            const toast = document.createElement('toast-message');
+            toast.setAttribute('type', String(type || 'info'));
+            toast.setAttribute('message', String(message || ''));
 
             toastContainer.prepend(toast);
 

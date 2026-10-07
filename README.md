@@ -46,6 +46,21 @@ Required permissions:
 - `elasticloadbalancing:CreateRule`
 - `route53:ChangeResourceRecordSets` (if using custom domains)
 
+### Scheduled tasks (cronjobs)
+
+A new service can be created as a scheduled task (`ecs-aws init` → New service → Scheduled task), or an existing task definition can be scheduled by picking `cronjob` as the service. You choose between:
+
+- **Scheduled task**: a classic EventBridge rule targeting ECS. Cron is evaluated in UTC.
+- **EventBridge Scheduler**: supports a timezone.
+
+The cron uses the AWS 6-field format (`minutes hours day-of-month month day-of-week year`, e.g. `0 3 * * ? *`), and the next 5 runs are shown live while you type it (CLI and web). Every deploy points the schedule at the new task definition revision, and deleting the service deletes the schedule.
+
+Additional permissions:
+
+- `events:PutRule`, `events:PutTargets`, `events:DescribeRule`, `events:RemoveTargets`, `events:DeleteRule` (scheduled task)
+- `scheduler:CreateSchedule`, `scheduler:UpdateSchedule`, `scheduler:GetSchedule`, `scheduler:DeleteSchedule` (EventBridge Scheduler)
+- `iam:ListRoles`, `iam:PassRole` on the schedule role, and `iam:CreateRole` + `iam:PutRolePolicy` if ecs-aws should create that role
+
 ### Deleting Services
 
 Required permissions:

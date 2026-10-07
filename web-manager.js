@@ -16,7 +16,15 @@ const {
     loadServices,
     loadLoadBalancers,
     loadListeners,
+    loadScheduleRoles,
+    createScheduleRole,
+    upsertSchedule,
+    deleteSchedule,
+    getScheduleStatus,
+    getLatestTaskDefinition,
+    getLastLogEventTime,
 } = require('./aws');
+const ecsCron = require('./cron');
 
 // Get configuration from environment
 const WORKING_DIR = process.env.ECS_AWS_WORKING_DIR || process.cwd();
@@ -71,6 +79,7 @@ function getConfigFileNameForProfile(profileName = '') {
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'web')));
+app.get('/cron.js', (_req, res) => res.sendFile(path.join(__dirname, 'cron.js')));
 app.use(express.json());
 
 // Store active log streams per socket
@@ -142,6 +151,44 @@ const getServiceInfoFromWorkingDir = async (profileName) => {
         const config = JSON.parse(configData);
 
         const hasService = typeof config.service === 'string' && config.service.trim().length > 0;
+
+        // Cronjob: report the schedule and task definition instead of service counters
+        if (!hasService && config.task) {
+            await loadAWSProfile(config);
+            const [scheduleStatus, latestTaskDefinition, lastLogEventAt] = await Promise.all([
+                getScheduleStatus(config).catch(error => ({ error: error.message })),
+                getLatestTaskDefinition(config.task).catch(() => null),
+                config.log ? getLastLogEventTime(config.log).catch(() => null) : null,
+            ]);
+            const scheduledRevision = String(scheduleStatus?.taskDefinitionArn || '').split('task-definition/')[1] || '';
+
+            let status = 'No schedule';
+            if (scheduleStatus?.error) status = 'Unknown';
+            else if (scheduleStatus?.exists) status = scheduleStatus.state === 'ENABLED' ? 'Scheduled' : 'Disabled';
+            else if (config.schedule) status = 'Not created';
+
+            return {
+                type: 'scheduled-task',
+                serviceName: config.task,
+                status,
+                taskDefinition: config.task,
+                taskDefinitionVersion: latestTaskDefinition ? String(latestTaskDefinition.revision) : 'N/A',
+                lastDeploymentAt: latestTaskDefinition?.registeredAt || null,
+                lastLogEventAt,
+                schedule: {
+                    type: config.schedule?.type || null,
+                    name: scheduleStatus?.name || config.schedule?.name || null,
+                    expression: scheduleStatus?.expression || (config.schedule ? ecsCron.toScheduleExpression(config.schedule.cron) : null),
+                    timezone: scheduleStatus?.timezone || config.schedule?.timezone || 'UTC',
+                    state: scheduleStatus?.state || null,
+                    exists: !!scheduleStatus?.exists,
+                    error: scheduleStatus?.error || null,
+                    // the schedule runs a pinned revision, or the latest one when it targets the bare family
+                    runsRevision: scheduledRevision.includes(':') ? scheduledRevision.split(':')[1] : (scheduledRevision ? 'latest' : null),
+                },
+                config,
+            };
+        }
 
         if (!hasService) {
             return {
@@ -325,6 +372,73 @@ app.get('/api/wizard/new-service/options', async (req, res) => {
     }
 });
 
+// IAM roles the chosen schedule type can assume
+app.get('/api/wizard/schedule-roles', async (req, res) => {
+    try {
+        const awsProfile = normalizeProfileName(req.query.awsProfile || 'default');
+        const region = req.query.region || 'eu-west-1';
+        await loadAWSProfile({ profile: awsProfile, region });
+        res.json({ roles: await loadScheduleRoles(req.query.type) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+function buildScheduleFromPayload(schedule) {
+    if (!schedule) {
+        return null;
+    }
+    const type = schedule.type === 'scheduler' ? 'scheduler' : 'rule';
+    const timezone = type === 'scheduler' ? (schedule.timezone || 'UTC') : 'UTC';
+    if (!ecsCron.isValidTimeZone(timezone)) {
+        throw new Error(`Unknown timezone "${timezone}"`);
+    }
+    const check = ecsCron.preview(schedule.cron, 1, { timeZone: timezone });
+    if (check.error) {
+        throw new Error(`Invalid cron expression: ${check.error}`);
+    }
+    if (!schedule.role_arn) {
+        throw new Error('Missing required field: schedule IAM role');
+    }
+    return {
+        type,
+        cron: String(schedule.cron).trim(),
+        timezone,
+        role_arn: schedule.role_arn,
+    };
+}
+
+// Creates/updates the schedule in AWS right after saving; a missing task definition just defers it to the first deploy
+async function applyScheduleChange(previousConfig, configData) {
+    const previous = previousConfig && !previousConfig.service ? previousConfig.schedule : null;
+    const next = configData.service ? null : configData.schedule;
+    if (!previous && !next) {
+        return null;
+    }
+
+    await loadAWSProfile({ profile: configData.profile, region: configData.region });
+
+    if (next && next.role_arn === '__create__') {
+        const roleName = `ecs-aws-${next.type === 'scheduler' ? 'scheduler' : 'events'}-role`;
+        next.role_arn = (await createScheduleRole(next.type, roleName)).arn;
+    }
+
+    const typeChanged = previous && (!next || previous.type !== next.type || previousConfig.task !== configData.task);
+    if (typeChanged) {
+        await deleteSchedule(previousConfig, previous);
+    }
+    if (!next) {
+        return { message: 'Schedule removed.' };
+    }
+
+    try {
+        const result = await upsertSchedule(configData);
+        return { message: `Schedule "${result.name}" is active: ${result.expression} (${next.timezone}).` };
+    } catch (error) {
+        return { warning: `Schedule saved in the config but not applied in AWS yet: ${String(error.message).replace(/\.$/, '')}. It is applied on the next deploy.` };
+    }
+}
+
 function buildWizardConfigFromPayload(payload = {}) {
     const isNewServiceMode = payload.serviceMode === 'new';
     const requiredFields = isNewServiceMode
@@ -365,6 +479,10 @@ function buildWizardConfigFromPayload(payload = {}) {
         env: envArray,
     };
 
+    if (!configData.service && !isNewServiceMode && payload.schedule) {
+        configData.schedule = buildScheduleFromPayload(payload.schedule);
+    }
+
     if (isNewServiceMode) {
         configData.new_service = {
             serviceName: payload.newService.serviceName,
@@ -390,6 +508,10 @@ app.post('/api/wizard/save/:profile', async (req, res) => {
         const configData = buildWizardConfigFromPayload(payload);
 
         const existed = fs.existsSync(configPath);
+        const previousConfig = existed
+            ? JSON.parse(await fs.promises.readFile(configPath, 'utf8').catch(() => '{}') || '{}')
+            : null;
+        const scheduleResult = await applyScheduleChange(previousConfig, configData);
         await fs.promises.writeFile(configPath, JSON.stringify(configData), 'utf8');
 
         return res.status(existed ? 200 : 201).json({
@@ -397,6 +519,7 @@ app.post('/api/wizard/save/:profile', async (req, res) => {
             configFileName,
             profile: normalizeProfileName(requestedProfile) || 'default',
             mode: existed ? 'updated' : 'created',
+            schedule: scheduleResult,
         });
     } catch (error) {
         return res.status(400).json({ error: error.message });
@@ -435,6 +558,21 @@ app.get('/api/profiles', (_req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
+});
+
+// Service name of every ECSConfig in the working directory, for the header switcher
+app.get('/api/services', async (_req, res) => {
+    const profiles = getProfilesFromWorkingDir();
+    const services = await Promise.all(profiles.map(async (profile) => {
+        try {
+            const config = JSON.parse(await loadConfigFileFromWorkingDir(getConfigFileNameForProfile(profile)));
+            const serviceArnName = config.service ? String(config.service).split('/').pop() : '';
+            return { profile, serviceName: config.service_name || serviceArnName || config.task || profile };
+        } catch (error) {
+            return { profile, serviceName: profile };
+        }
+    }));
+    res.json(services);
 });
 
 app.get('/api/config/:profile', async (req, res) => {

@@ -5,7 +5,10 @@ const { ECRClient, DescribeImagesCommand, DescribeRepositoriesCommand, CreateRep
 const { EC2Client, DescribeRegionsCommand } = require('@aws-sdk/client-ec2');
 const { ElasticLoadBalancingV2Client, DescribeLoadBalancersCommand, DescribeTargetGroupsCommand, DescribeTargetHealthCommand, DescribeListenersCommand, CreateTargetGroupCommand, CreateRuleCommand, DescribeRulesCommand, DeleteTargetGroupCommand, DeleteRuleCommand } = require('@aws-sdk/client-elastic-load-balancing-v2');
 const { Route53Client, ListHostedZonesCommand, ChangeResourceRecordSetsCommand } = require('@aws-sdk/client-route-53');
-const { IAMClient, SimulatePrincipalPolicyCommand } = require('@aws-sdk/client-iam');
+const { IAMClient, SimulatePrincipalPolicyCommand, ListRolesCommand, CreateRoleCommand, PutRolePolicyCommand } = require('@aws-sdk/client-iam');
+const { EventBridgeClient, PutRuleCommand, PutTargetsCommand, RemoveTargetsCommand, DeleteRuleCommand: DeleteEventRuleCommand, DescribeRuleCommand, ListTargetsByRuleCommand } = require('@aws-sdk/client-eventbridge');
+const { SchedulerClient, CreateScheduleCommand, UpdateScheduleCommand, GetScheduleCommand, DeleteScheduleCommand } = require('@aws-sdk/client-scheduler');
+const { toScheduleExpression } = require('./cron');
 const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
 const { fromIni } = require('@aws-sdk/credential-providers');
 const fs = require('fs');
@@ -21,6 +24,8 @@ let elbv2Client = new ElasticLoadBalancingV2Client({});
 let route53Client = new Route53Client({});
 let iamClient = new IAMClient({});
 let stsClient = new STSClient({});
+let eventBridgeClient = new EventBridgeClient({});
+let schedulerClient = new SchedulerClient({});
 
 const getServiceData = async (arroProfileData) => {
   const params = {
@@ -153,6 +158,8 @@ const loadAWSProfile = async (arroProfileData) => {
     route53Client = new Route53Client({ region, credentials });
     iamClient = new IAMClient({ region, credentials });
     stsClient = new STSClient({ region, credentials });
+    eventBridgeClient = new EventBridgeClient({ region, credentials });
+    schedulerClient = new SchedulerClient({ region, credentials });
 
     // Test credentials by attempting to get caller identity
     await credentials();
@@ -202,6 +209,13 @@ const updateService = async (arroProfileData, sTag, region) => {
   const registerCommand = new RegisterTaskDefinitionCommand(definition);
   const data = await ecsClient.send(registerCommand);
 
+  if (!arroProfileData.service) {
+    if (arroProfileData.schedule) {
+      await upsertSchedule(arroProfileData, data.taskDefinition.taskDefinitionArn);
+    }
+    return data;
+  }
+
   const params = {
     service: arroProfileData.service,
     taskDefinition: data.taskDefinition.taskDefinitionArn,
@@ -210,6 +224,252 @@ const updateService = async (arroProfileData, sTag, region) => {
 
   const updateCommand = new UpdateServiceCommand(params);
   return ecsClient.send(updateCommand);
+};
+
+// ===== Scheduled tasks (cronjobs) =====
+// config.schedule = { type: 'rule' | 'scheduler', cron, timezone, role_arn, name }
+//   rule      = classic EventBridge rule targeting ECS ("ECS scheduled task"), always UTC
+//   scheduler = EventBridge Scheduler, supports timezones
+const SCHEDULE_TARGET_ID = 'ecs-aws';
+const SCHEDULE_PRINCIPALS = {
+  rule: 'events.amazonaws.com',
+  scheduler: 'scheduler.amazonaws.com',
+};
+
+const getScheduleName = arroProfileData => (arroProfileData.schedule && arroProfileData.schedule.name)
+  || String(arroProfileData.task || '').replace(/[^\w.-]/g, '-').substring(0, 64);
+
+const getLatestTaskDefinitionArn = async (family) => {
+  const data = await ecsClient.send(new DescribeTaskDefinitionCommand({ taskDefinition: family }));
+  return data.taskDefinition.taskDefinitionArn;
+};
+
+const scheduleEcsParameters = taskDefinitionArn => ({
+  TaskDefinitionArn: taskDefinitionArn,
+  TaskCount: 1,
+  LaunchType: 'EC2',
+});
+
+// Creates or updates the schedule so it runs `taskDefinitionArn` (defaults to the latest revision of config.task)
+const upsertSchedule = async (arroProfileData, taskDefinitionArn) => {
+  const schedule = arroProfileData.schedule;
+  if (!schedule || !schedule.cron) {
+    throw new Error('No schedule configured');
+  }
+  if (!schedule.role_arn) {
+    throw new Error('Schedule has no IAM role (role_arn)');
+  }
+  const name = getScheduleName(arroProfileData);
+  const taskArn = taskDefinitionArn || await getLatestTaskDefinitionArn(arroProfileData.task);
+  const expression = toScheduleExpression(schedule.cron);
+
+  const notFound = (err) => {
+    if (err.name === 'ResourceNotFoundException') return null;
+    throw err;
+  };
+
+  if (schedule.type === 'scheduler') {
+    // An existing schedule (possibly made in the console) keeps its own settings; only the cron, timezone,
+    // role and task definition are replaced
+    const existing = await schedulerClient.send(new GetScheduleCommand({ Name: name })).catch(notFound);
+    const existingTarget = (existing && existing.Target) || {};
+    const params = {
+      Name: name,
+      GroupName: existing ? existing.GroupName : undefined,
+      ScheduleExpression: expression,
+      ScheduleExpressionTimezone: schedule.timezone || 'UTC',
+      FlexibleTimeWindow: existing ? existing.FlexibleTimeWindow : { Mode: 'OFF' },
+      State: existing ? existing.State : 'ENABLED',
+      Description: existing ? existing.Description : `ecs-aws: ${arroProfileData.task}`,
+      StartDate: existing ? existing.StartDate : undefined,
+      EndDate: existing ? existing.EndDate : undefined,
+      KmsKeyArn: existing ? existing.KmsKeyArn : undefined,
+      ActionAfterCompletion: existing ? existing.ActionAfterCompletion : undefined,
+      Target: {
+        ...existingTarget,
+        Arn: arroProfileData.cluster,
+        RoleArn: schedule.role_arn,
+        EcsParameters: existing
+          ? { ...existingTarget.EcsParameters, TaskDefinitionArn: taskArn }
+          : scheduleEcsParameters(taskArn),
+      },
+    };
+    await schedulerClient.send(existing ? new UpdateScheduleCommand(params) : new CreateScheduleCommand(params));
+    return { name, type: 'scheduler', expression, taskDefinitionArn: taskArn, created: !existing };
+  }
+
+  // Rule: keep its state/description, and update the targets already running on this cluster instead of adding one
+  const existingRule = await eventBridgeClient.send(new DescribeRuleCommand({ Name: name })).catch(notFound);
+  const rule = await eventBridgeClient.send(new PutRuleCommand({
+    Name: name,
+    ScheduleExpression: expression,
+    State: existingRule ? existingRule.State : 'ENABLED',
+    Description: existingRule ? existingRule.Description : `ecs-aws: ${arroProfileData.task}`,
+  }));
+  const currentTargets = existingRule
+    ? ((await eventBridgeClient.send(new ListTargetsByRuleCommand({ Rule: name }))).Targets || [])
+      .filter(target => target.Arn === arroProfileData.cluster && target.EcsParameters)
+    : [];
+  const targetsToPut = currentTargets.length
+    ? currentTargets.map(target => ({
+      ...target,
+      RoleArn: schedule.role_arn,
+      EcsParameters: { ...target.EcsParameters, TaskDefinitionArn: taskArn },
+    }))
+    : [{
+      Id: SCHEDULE_TARGET_ID,
+      Arn: arroProfileData.cluster,
+      RoleArn: schedule.role_arn,
+      EcsParameters: scheduleEcsParameters(taskArn),
+    }];
+  const targets = await eventBridgeClient.send(new PutTargetsCommand({ Rule: name, Targets: targetsToPut }));
+  if (targets.FailedEntryCount) {
+    throw new Error(`Could not set schedule target: ${targets.FailedEntries.map(e => e.ErrorMessage).join(', ')}`);
+  }
+  return { name, type: 'rule', expression, taskDefinitionArn: taskArn, ruleArn: rule.RuleArn };
+};
+
+// Live state of the configured schedule in AWS: { exists, state, expression, timezone, taskDefinitionArn }
+const getScheduleStatus = async (arroProfileData) => {
+  const schedule = arroProfileData.schedule;
+  if (!schedule) {
+    return null;
+  }
+  const name = getScheduleName(arroProfileData);
+  const notFound = (err) => {
+    if (err.name === 'ResourceNotFoundException') return null;
+    throw err;
+  };
+
+  if (schedule.type === 'scheduler') {
+    const data = await schedulerClient.send(new GetScheduleCommand({ Name: name })).catch(notFound);
+    if (!data) return { name, exists: false };
+    return {
+      name,
+      exists: true,
+      state: data.State,
+      expression: data.ScheduleExpression,
+      timezone: data.ScheduleExpressionTimezone || 'UTC',
+      taskDefinitionArn: data.Target && data.Target.EcsParameters && data.Target.EcsParameters.TaskDefinitionArn,
+    };
+  }
+
+  const rule = await eventBridgeClient.send(new DescribeRuleCommand({ Name: name })).catch(notFound);
+  if (!rule) return { name, exists: false };
+  const { Targets = [] } = await eventBridgeClient.send(new ListTargetsByRuleCommand({ Rule: name }));
+  const target = Targets.find(t => t.Arn === arroProfileData.cluster && t.EcsParameters) || Targets[0];
+  return {
+    name,
+    exists: true,
+    state: rule.State,
+    expression: rule.ScheduleExpression,
+    timezone: 'UTC',
+    taskDefinitionArn: target && target.EcsParameters && target.EcsParameters.TaskDefinitionArn,
+  };
+};
+
+// Newest revision of a task definition family: { arn, revision, registeredAt }
+const getLatestTaskDefinition = async (family) => {
+  const data = await ecsClient.send(new DescribeTaskDefinitionCommand({ taskDefinition: family }));
+  return {
+    arn: data.taskDefinition.taskDefinitionArn,
+    revision: data.taskDefinition.revision,
+    registeredAt: data.taskDefinition.registeredAt,
+  };
+};
+
+// Timestamp of the most recent log event in a log group (null when empty)
+const getLastLogEventTime = async (logGroupName) => {
+  const data = await cloudwatchlogsClient.send(new DescribeLogStreamsCommand({
+    logGroupName,
+    descending: true,
+    limit: 1,
+    orderBy: 'LastEventTime',
+  }));
+  const stream = (data.logStreams || [])[0];
+  return stream && stream.lastEventTimestamp ? new Date(stream.lastEventTimestamp).toISOString() : null;
+};
+
+// Returns true when deleted (or already gone), false on failure, like the other delete helpers
+const deleteSchedule = async (arroProfileData, schedule = arroProfileData.schedule) => {
+  if (!schedule) {
+    return true;
+  }
+  const name = getScheduleName({ ...arroProfileData, schedule });
+  const notFound = err => err && err.name === 'ResourceNotFoundException';
+  try {
+    if (schedule.type === 'scheduler') {
+      await schedulerClient.send(new DeleteScheduleCommand({ Name: name })).catch((err) => {
+        if (!notFound(err)) throw err;
+      });
+      return true;
+    }
+    const exists = await eventBridgeClient.send(new DescribeRuleCommand({ Name: name }))
+      .then(() => true)
+      .catch((err) => {
+        if (notFound(err)) return false;
+        throw err;
+      });
+    if (exists) {
+      const { Targets = [] } = await eventBridgeClient.send(new ListTargetsByRuleCommand({ Rule: name }));
+      if (Targets.length) {
+        await eventBridgeClient.send(new RemoveTargetsCommand({ Rule: name, Ids: Targets.map(target => target.Id) }));
+      }
+      await eventBridgeClient.send(new DeleteEventRuleCommand({ Name: name }));
+    }
+    return true;
+  } catch (error) {
+    console.error(`Error deleting schedule ${name}:`, error.message);
+    return false;
+  }
+};
+
+// IAM roles that the given schedule type is allowed to assume
+const loadScheduleRoles = async (type) => {
+  const principal = SCHEDULE_PRINCIPALS[type] || SCHEDULE_PRINCIPALS.rule;
+  const roles = [];
+  let Marker;
+  do {
+    const data = await iamClient.send(new ListRolesCommand({ Marker }));
+    (data.Roles || []).forEach((role) => {
+      const policy = decodeURIComponent(role.AssumeRolePolicyDocument || '');
+      if (policy.includes(principal)) {
+        roles.push({ name: role.RoleName, arn: role.Arn });
+      }
+    });
+    Marker = data.IsTruncated ? data.Marker : undefined;
+  } while (Marker);
+  return roles;
+};
+
+// Creates a role the schedule can assume to run ECS tasks (ecs:RunTask + passing the task's roles)
+const createScheduleRole = async (type, roleName) => {
+  const principal = SCHEDULE_PRINCIPALS[type] || SCHEDULE_PRINCIPALS.rule;
+  const data = await iamClient.send(new CreateRoleCommand({
+    RoleName: roleName,
+    Description: `Lets ${principal} run ECS tasks (created by ecs-aws)`,
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [{ Effect: 'Allow', Principal: { Service: principal }, Action: 'sts:AssumeRole' }],
+    }),
+  }));
+  await iamClient.send(new PutRolePolicyCommand({
+    RoleName: roleName,
+    PolicyName: 'ecs-aws-run-task',
+    PolicyDocument: JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [
+        { Effect: 'Allow', Action: 'ecs:RunTask', Resource: '*' },
+        {
+          Effect: 'Allow',
+          Action: 'iam:PassRole',
+          Resource: '*',
+          Condition: { StringLike: { 'iam:PassedToService': 'ecs-tasks.amazonaws.com' } },
+        },
+      ],
+    }),
+  }));
+  return { name: data.Role.RoleName, arn: data.Role.Arn };
 };
 
 const forceNewDeployment = async (arroProfileData) => {
@@ -269,20 +529,43 @@ const checkTag = async (arroProfileData, tag) => {
 };
 
 const checkLogGroup = async (arroProfileData) => {
-  const describeCommand = new DescribeLogGroupsCommand({});
-  const data = await cloudwatchlogsClient.send(describeCommand);
+  let nextToken;
+  let logGroupExists = false;
 
-  const arroLogs = data.logGroups.filter(oLog => arroProfileData.log === oLog.logGroupName);
+  do {
+    const describeCommand = new DescribeLogGroupsCommand({
+      logGroupNamePrefix: arroProfileData.log,
+      nextToken,
+    });
+    const data = await cloudwatchlogsClient.send(describeCommand);
+    const logGroups = data.logGroups || [];
 
-  if (!arroLogs.length) {
-    const params = {
-      logGroupName: arroProfileData.log,
-    };
+    if (logGroups.some(logGroup => logGroup.logGroupName === arroProfileData.log)) {
+      logGroupExists = true;
+      break;
+    }
+
+    nextToken = data.nextToken;
+  } while (nextToken);
+
+  if (logGroupExists) {
+    return { created: false };
+  }
+
+  const params = {
+    logGroupName: arroProfileData.log,
+  };
+
+  try {
     const createCommand = new CreateLogGroupCommand(params);
     await cloudwatchlogsClient.send(createCommand);
     return { created: true };
+  } catch (err) {
+    if (err && err.name === 'ResourceAlreadyExistsException') {
+      return { created: false };
+    }
+    throw err;
   }
-  return { created: false };
 };
 
 const checkDockerRepo = async (repoName) => {
@@ -889,4 +1172,12 @@ module.exports = {
   checkCreatePermissions,
   checkDeletePermissions,
   getAccountId,
+  upsertSchedule,
+  deleteSchedule,
+  loadScheduleRoles,
+  createScheduleRole,
+  getScheduleName,
+  getScheduleStatus,
+  getLatestTaskDefinition,
+  getLastLogEventTime,
 };
